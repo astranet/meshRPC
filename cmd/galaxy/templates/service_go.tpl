@@ -40,7 +40,7 @@ func New{{.FeaturePrefix}}Service(
 		fields: log.Fields{
 			"layer":   "service",
 			"service": "{{.ServiceName}}",
-		}
+		},
 
 		{{if .RepoEnabled}}repo: repo,{{end}}
 	}

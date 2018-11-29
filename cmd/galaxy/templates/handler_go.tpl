@@ -42,7 +42,7 @@ func New{{.FeaturePrefix}}Handler(
 		fields: log.Fields{
 			"layer":   "handler",
 			"service": "{{.ServiceName}}",
-		}
+		},
 
 		svc:     svc,
 	}

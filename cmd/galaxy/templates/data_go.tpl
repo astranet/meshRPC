@@ -41,7 +41,7 @@ func New{{.FeaturePrefix}}DataRepo(
 		fields: log.Fields{
 			"layer":   "data",
 			"service": "{{.ServiceName}}",
-		}
+		},
 
 		dataCache: dataCache,
 	}
