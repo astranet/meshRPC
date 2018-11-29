@@ -10,7 +10,7 @@ $ go get -u github.com/astranet/galaxy
 
 ### Usage
 
-```bash
+```
 $ galaxy -h
 
 Usage: galaxy [OPTIONS] COMMAND [arg...]
@@ -31,7 +31,7 @@ Run 'galaxy COMMAND --help' for more information on a command.
 
 ### Example
 
-```bash
+```
 $ galaxy new -h
 
 Usage: galaxy new [OPTIONS]
@@ -65,7 +65,7 @@ main.go:96: Done in 10.344156ms
 
 The expose generator, that can be triggered by running `go generate`, already placed in generated `service.go`.
 
-```
+```go
 //go:generate galaxy expose -y -P greeter
 ```
 
