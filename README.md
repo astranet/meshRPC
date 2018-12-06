@@ -66,7 +66,7 @@ main.go:96: Done in 10.344156ms
 The expose generator, that can be triggered by running `go generate`, already placed in generated `service.go`.
 
 ```go
-//go:generate galaxy expose -y -P greeter
+//go:generate galaxy -D ../.. expose -y -P greeter
 ```
 
 See https://github.com/astranet/example_api for a full-featured example infrastructure.

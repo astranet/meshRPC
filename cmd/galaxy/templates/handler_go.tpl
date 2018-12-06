@@ -66,6 +66,7 @@ func (h *{{.HandlerPrivateName}} ) {{.ExampleFuncName}}(c *gin.Context) {
 	if err != nil {
 		fnLog.Warn(err)
 		bugsnag.Notify(err)
+		metrics.ReportFuncError(h.tags)
 		c.String(http.StatusInternalServerError, "error: %v", err)
 		return
 	}
