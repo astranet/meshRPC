@@ -329,7 +329,12 @@ func (a *astraClient) enableReverseProxy() {
 						req.Method, req.URL.Path, strings.Join(a.endpoint.Methods, ",")))
 				return
 			}
+			var query string
+			if req.URL != nil {
+				query = req.URL.RawQuery
+			}
 			req.URL, _ = url.Parse("http://" + serviceFQDN(a.endpoint.Service) + a.endpoint.Path)
+			req.URL.RawQuery = query
 		},
 	}
 }
@@ -376,7 +381,12 @@ func (a *astraClient) Do(req *http.Request) (*http.Response, error) {
 		}
 		path = rewritePath(fnName, path)
 	}
+	var query string
+	if req.URL != nil {
+		query = req.URL.RawQuery
+	}
 	req.URL, _ = url.Parse("http://" + serviceFQDN(a.endpoint.Service) + path)
+	req.URL.RawQuery = query
 	if !a.endpoint.MethodAllowed(req.Method) {
 		err := fmt.Errorf("cluster client: method %s not allowed for %s: must be %s",
 			req.Method, path, strings.Join(a.endpoint.Methods, ","))
