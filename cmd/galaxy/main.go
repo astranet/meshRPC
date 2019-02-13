@@ -14,7 +14,7 @@ import (
 )
 
 var app = cli.App("galaxy", "A tool for generating boilerplate code for new services and components using astranet:Galaxy toolkit.")
-var projectDir = app.StringOpt("D dir", defaultProjectDir(), "Sets the target project root.")
+var projectDir = app.StringOpt("D dir", filepath.Join("..", ".."), "Sets the target project root.")
 
 func init() {
 	log.SetFlags(log.Lshortfile)
@@ -240,14 +240,6 @@ func exposeCmd(c *cli.Cmd) {
 		}
 		log.Println("Done in", time.Since(ts))
 	}
-}
-
-func defaultProjectDir() string {
-	gopath := os.Getenv("GOPATH")
-	if len(gopath) == 0 {
-		panic("no $GOPATH env var set")
-	}
-	return filepath.Join(gopath, "src", "github.com", "astranet", "example_api")
 }
 
 type TemplateContext struct {
