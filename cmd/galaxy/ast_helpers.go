@@ -186,11 +186,14 @@ func (p Pkg) funcsig(f *ast.Field) Method {
 	return fn
 }
 
-func methodsOf(iface string, srcDir string) ([]Method, string, error) {
-	// Locate the interface.
-	path, id, err := findInterface(iface, srcDir)
-	if err != nil {
-		return nil, "", err
+func methodsOf(path, id string, iface string, srcDir string) ([]Method, string, error) {
+	var err error
+
+	if len(id) == 0 {
+		// Locate the interface.
+		if path, id, err = findInterface(iface, srcDir); err != nil {
+			return nil, "", err
+		}
 	}
 
 	// Parse the package and find the interface declaration.
@@ -211,7 +214,7 @@ func methodsOf(iface string, srcDir string) ([]Method, string, error) {
 	for _, fndecl := range idecl.Methods.List {
 		if len(fndecl.Names) == 0 {
 			// Embedded interface: recurse
-			embedded, _, err := methodsOf(p.fullType(fndecl.Type), srcDir)
+			embedded, _, err := methodsOf("", "", p.fullType(fndecl.Type), srcDir)
 			if err != nil {
 				return nil, srcPath, err
 			}

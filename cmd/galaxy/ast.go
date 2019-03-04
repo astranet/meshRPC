@@ -14,7 +14,7 @@ func NewMethodsCollection(ifaceName string, srcDir string) (*MethodsCollection, 
 		Path: path,
 		ID:   id,
 	}
-	methods, srcPath, err := methodsOf(ifaceName, srcDir)
+	methods, srcPath, err := methodsOf(path, id, ifaceName, srcDir)
 	if err != nil {
 		return nil, err
 	}
