@@ -5,9 +5,9 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/mongodb/mongo-go-driver/bson"
-	"github.com/mongodb/mongo-go-driver/mongo"
-	"github.com/mongodb/mongo-go-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type M = bson.M
@@ -21,6 +21,7 @@ type DBMongo struct {
 }
 
 type MongoConfig struct {
+	AppName    string
 	Connection string
 	SSLCert    string
 	Database   string
@@ -28,7 +29,10 @@ type MongoConfig struct {
 }
 
 func NewDBMongo(ctx context.Context, config *MongoConfig) (*DBMongo, error) {
-	cli, err := mongo.Connect(ctx, config.Connection)
+	opt := options.Client()
+	opt = opt.ApplyURI(config.Connection)
+	opt = opt.SetAppName(config.AppName)
+	cli, err := mongo.Connect(ctx, opt)
 	if err != nil {
 		return nil, err
 	}
