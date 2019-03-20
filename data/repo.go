@@ -1,7 +1,7 @@
 package data
 
 import (
-	"github.com/astranet/galaxy/db"
+	db "github.com/astranet/galaxy/db_mongo"
 )
 
 func NewRepo(db *db.DBMongo) Repo {
