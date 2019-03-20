@@ -27,8 +27,8 @@ type MongoConfig struct {
 	Debug      bool
 }
 
-func NewDBMongo(config *MongoConfig) (*DBMongo, error) {
-	cli, err := mongo.Connect(context.TODO(), config.Connection)
+func NewDBMongo(ctx context.Context, config *MongoConfig) (*DBMongo, error) {
+	cli, err := mongo.Connect(ctx, config.Connection)
 	if err != nil {
 		return nil, err
 	}
