@@ -6,12 +6,12 @@ package {{.PackageName}}
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	log "github.com/sirupsen/logrus"
 
+	"github.com/pkg/errors"
 	"github.com/astranet/galaxy/metrics"
 )
 
