@@ -1,10 +1,9 @@
 # Mesh RPC
 
-Automatic Service Mesh generator for pure Go micro services, a humble alternative to gRPC! A service mesh is a dedicated infrastructure layer for managing service-to-service communication, including RPC over HTTP. The `meshRPC` tool paired with `cluster` package is able to transform any type of legacy Go service into a new stack ops dream.
+Automatic Service Mesh generator for pure Go micro services, a humble alternative to gRPC! A service mesh is a dedicated infrastructure layer for managing service-to-service communication, including RPC over HTTP. The `meshRPC` tool paired with `cluster` package is able to transform any type of legacy Go service into a "new stack" operator's dream.
 
 Even for such legacy services that contain many layers inside a single process, this framework can be used to decouple things,
-using interface substitution. Consider an interface A, then use this tool to generate a microservice that implements interface A, but once called, instead of interface A invocation, there will be an RPC call over network to the corresponding microservice.
-In this way you can separate a big project by small pieces without hurting integrity (just adding a bit of network latency).
+using interface substitution. Consider an `interface A`, then use this tool to generate a microservice that implements `interface A`, but once called, instead of `interface A` invocation, there will be an RPC call over network to the corresponding microservice. In this way you can separate a big project by small pieces without hurting integrity (just adding a bit of network latency).
 
 All generated microservices require zero-configuration and are load-balanced (round robin with sticky sessions) out of the box!
 
@@ -20,13 +19,6 @@ Create a service file like this one:
 
 ```go
 package greeter
-
-type Postcard struct {
-    PictureURL string
-    Address    string
-    Recipient  string
-    Message    string
-}
 
 //go:generate meshRPC expose -P greeter -y
 
@@ -258,18 +250,142 @@ sending greeter.Postcard{PictureURL:"", Address:"World", Recipient:"Max", Messag
 
 Great! Next we need to do is orchestration and scaling.
 
-### Example: Orchestration, Scaling
+### Usage: Dockerfiles
+
+Let's create a simple `Dockerfile` that creates minimalistic Alpine containers. This is up to you what method to use in parctice, for example in some project I use golang's base image because I need a lot of dependencies that don't exist in Alpine.
 
 ```
-kek
+FROM golang:1.12-alpine as builder
+
+RUN apk add --no-cache git
+
+ENV GOPATH=/gopath
+RUN go get github.com/astranet/meshRPC/example/greeter
+
+FROM alpine:latest
+
+RUN apk add --no-cache ca-certificates
+COPY --from=builder /gopath/bin/greeter /usr/local/bin/
+
+EXPOSE 11999
+ENTRYPOINT ["greeter"]
 ``` 
+
+A similar [Dockerfile](https://github.com/astranet/meshRPC/tree/master/example/mesh_api/Dockerfile) has been made for `mesh_api` too. It just exposes both ports instead of one. Note - for real apps you should vendoring or Go modules instead of simple go get.
+
+To get both containers as we built it, use
+
+```
+$ docker pull docker.direct/meshrpc/example/greeter
+$ docker pull docker.direct/meshrpc/example/mesh_api
+```
+
+### Usage: Docker Compose (also Docker Stack)
+
+First, we need a `docker-compose.yml` that contains a simple definition. Here we use docker images generated before, and we set cluster node list using an environment variable `MESHRPC_CLUSTER_NODES`. We'll expose only `8282` port for the API Gateway. Virtual net allows to reference hosts by their nodes easily, however, if you want to use host net just make sure to avoid port collision for `mesh_api` and other nodes.
+
+```
+version: "3"
+services:
+  mesh-api:
+    image: docker.direct/meshrpc/example/mesh_api:latest
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+    environment:
+      - MESHRPC_CLUSTER_NODES=mesh-api,greeter
+    ports:
+      - "8282:8282"
+    depends_on:
+      - greeter
+    networks:
+      - meshnet
+  greeter:
+    image: docker.direct/meshrpc/example/greeter:latest
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+    environment:
+      - MESHRPC_CLUSTER_NODES=mesh-api,greeter
+    networks:
+      - meshnet
+networks:
+  meshnet:
+```
+
+Let's run this stack, you can use old good `docker-compose` but for future's sake I'll use `docker stack` here.
+
+```
+$ docker stack deploy -c docker-compose.yml meshrpc-example
+Creating network meshrpc-example_meshnet
+Creating service meshrpc-example_mesh-api
+Creating service meshrpc-example_greeter
+
+$ docker stack ls
+NAME                SERVICES            ORCHESTRATOR
+meshrpc-example     2                   Swarm
+```
+
+Check if everything started correctly:
+
+```
+CONTAINER ID   IMAGE                                           NAMES
+============   =============================================   ====================================================
+e0cde9c1ce9d   docker.direct/meshrpc/example/greeter:latest    meshrpc-example_greeter.1.olhmh4ho2kvqck37zm7qm3zbt
+767aee3bd128   docker.direct/meshrpc/example/mesh_api:latest   meshrpc-example_mesh-api.1.dzee3mvff6a3duzejeb1gg0q1
+```
+
+Run the usual API query:
+
+```
+$ curl http://localhost:8282/greeter/check
+All ok! 2019-05-24T19:09:42Z
+```
+
+Works flawlessly! See the logs of the docker (the `greeter` container): 
+
+```
+$ docker logs -f e0cde9c1ce9d
+=============================
+[GIN] 2019/05/24 - 19:06:58 | 200 |        15.6µs |    EvbuE1rKRY0A | GET      /ping
+[GIN] 2019/05/24 - 19:09:41 | 200 |       106.9µs |      10.255.0.2 | GET      /handler/Check
+[GIN] 2019/05/24 - 19:09:42 | 200 |        62.5µs |      10.255.0.2 | GET      /handler/Check
+[GIN] 2019/05/24 - 19:09:42 | 200 |       350.6µs |      10.255.0.2 | GET      /handler/Check
+```
+
+Maybe scale a little bit?
+
+```
+$ docker service scale meshrpc-example_greeter=5
+meshrpc-example_greeter scaled to 5
+overall progress: 5 out of 5 tasks
+1/5: running   [==================================================>]
+2/5: running   [==================================================>]
+3/5: running   [==================================================>]
+4/5: running   [==================================================>]
+5/5: running   [==================================================>]
+verify: Service converged
+```
+
+And check the load balancing after querying the API Gateway. Nodes become available almost immediately, and require no warmp. Nodes can be taken down without hanging connections.
+
+```
+meshrpc-example_greeter.1.olhmh4ho2kvq    | [GIN] | 200 |       287.5µs |      10.255.0.2 | GET      /handler/Check
+meshrpc-example_greeter.1.olhmh4ho2kvq    | [GIN] | 200 |       183.9µs |      10.255.0.2 | GET      /handler/Check
+meshrpc-example_greeter.1.olhmh4ho2kvq    | [GIN] | 200 |        74.2µs |      10.255.0.2 | GET      /handler/Check
+meshrpc-example_greeter.2.y6cen26m1wcu    | [GIN] | 200 |       146.2µs |      10.255.0.2 | GET      /handler/Check
+meshrpc-example_greeter.2.y6cen26m1wcu    | [GIN] | 200 |       212.4µs |      10.255.0.2 | GET      /handler/Check
+meshrpc-example_greeter.5.t900isxh3568    | [GIN] | 200 |       175.5µs |      10.255.0.2 | GET      /handler/Check
+meshrpc-example_greeter.5.t900isxh3568    | [GIN] | 200 |       304.3µs |      10.255.0.2 | GET      /handler/Check
+```
 
 At this point out tutorial and example section is over. We kindly forwarding you to [meshRPC/example](https://github.com/astranet/meshRPC/tree/master/example) for reference implementation and a playground for starting your cluster.
 
-
-
 ### Benchmarks
 
+TODO. Stay tuned :)
 
 ### Fixing templates
 

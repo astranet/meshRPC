@@ -2,7 +2,7 @@ all:
 
 GIT_HASH := $(shell git rev-parse --short HEAD)
 GIT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
-IMAGE_NAME := "docker.direct/meshrpc/example/greeter"
+IMAGE_NAME := "docker.direct/meshrpc/example/mesh_api"
 CURRDIR=$(PWD)
 
 image:
@@ -18,6 +18,6 @@ gen:
 	go generate ./...
 
 install:
-	go get github.com/astranet/meshRPC/example/greeter
+	go get github.com/astranet/meshRPC/example/mesh_api
 
 .PHONY: gen

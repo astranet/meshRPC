@@ -1,0 +1,28 @@
+version: "3"
+services:
+  mesh-api:
+    image: docker.direct/meshrpc/example/mesh_api:latest
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+    environment:
+      - MESHRPC_CLUSTER_NODES=mesh-api,greeter
+    ports:
+      - "8282:8282"
+    depends_on:
+      - greeter
+    networks:
+      - meshnet
+  greeter:
+    image: docker.direct/meshrpc/example/greeter:latest
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+    environment:
+      - MESHRPC_CLUSTER_NODES=mesh-api,greeter
+    networks:
+      - meshnet
+networks:
+  meshnet:

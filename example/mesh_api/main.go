@@ -86,6 +86,7 @@ func httpListenAndServe(c cluster.Cluster) {
 
 	// Set an endpoint handler for the Greet function.
 	// Example Request:
+	// $ curl http://localhost:8282/greeter/greet/Max
 	router.GET("/greeter/greet/:name", func(c *gin.Context) {
 		// Service call is actually done over meshRPC...
 		message, err := svc.Greet(c.Param("name"))
@@ -99,6 +100,7 @@ func httpListenAndServe(c cluster.Cluster) {
 
 	// Set an endpoint handler for the SendPostcard function.
 	// Example Request:
+	// $ curl -X POST http://localhost:8282/greeter/sendPostcard/Max/World/Hello
 	router.POST("/greeter/sendPostcard/:recipient/:address/:message", func(c *gin.Context) {
 		// Fill the object fields with supplied params.
 		postcard := &greeter.Postcard{
@@ -122,10 +124,12 @@ func httpListenAndServe(c cluster.Cluster) {
 	// and permissions attached.
 	//
 	// Example Request:
+	// $ curl http://localhost:8282/greeter/check
 	greeterClient2 := c.NewClient("greeter", greeter.HandlerSpec)
 	router.GET("/greeter/check", gin.WrapH(greeterClient2.Use("Check")))
 	// And meshRPC endpoints too!
 	// Example Request:
+	// $ curl -d'{"name": "Max"}' http://localhost:8282/greeter/greet
 	router.POST("/greeter/greet", gin.WrapH(greeterClient.Use("Greet")))
 
 	listenAddr := *httpListenHost + ":" + *httpListenPort
