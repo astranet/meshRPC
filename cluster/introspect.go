@@ -22,18 +22,13 @@ func httpMethodsOf(spec HandlerSpec) map[string][]string {
 	return nil
 }
 
-func reflectEndpoints(spec HandlerSpec) ([]*EndpointInfo, error) {
+func reflectEndpoints(serviceName string, spec HandlerSpec) ([]*EndpointInfo, error) {
 	if spec == nil {
 		return nil, errors.New("reflectEndpoints: spec is nil")
 	}
 	specTyp := reflect.TypeOf(spec)
 	specVal := reflect.ValueOf(spec)
-	pkgName, handlerName := ifaceToPkgName(specTyp)
-	if !strings.Contains(pkgName, "/core/") {
-		err := errors.New("reflectEndpoints: spec is from outside /core/ package path")
-		return nil, err
-	}
-	serviceName, path := pkgToServicePath(pkgName)
+	_, handlerName := ifaceToPkgName(specTyp)
 	httpMethods := httpMethodsOf(spec)
 
 	n := specTyp.NumMethod()
@@ -44,10 +39,16 @@ func reflectEndpoints(spec HandlerSpec) ([]*EndpointInfo, error) {
 			handlerFn := specVal.MethodByName(m.Name).Interface().(func(c *gin.Context))
 			endpoint := &EndpointInfo{
 				Service: serviceName,
-				Path:    fmt.Sprintf("%s/%s/%s", path, handlerName, m.Name),
-				Methods: httpMethods[m.Name],
+				Path:    fmt.Sprintf("/%s/%s", handlerName, m.Name),
 				Handler: handlerFn,
 				SpecTyp: specTyp,
+			}
+			if methods, ok := httpMethods["*"]; ok {
+				// has a record that matches all endpoints
+				endpoint.Methods = methods
+			} else {
+				// otherwise use specific methods
+				endpoint.Methods = httpMethods[m.Name]
 			}
 			endpoints = append(endpoints, endpoint)
 		}
@@ -55,7 +56,7 @@ func reflectEndpoints(spec HandlerSpec) ([]*EndpointInfo, error) {
 	return endpoints, nil
 }
 
-func reflectEndpointInfo(spec HandlerSpec, fnName string) (*EndpointInfo, error) {
+func reflectEndpointInfo(serviceName string, spec HandlerSpec, fnName string) (*EndpointInfo, error) {
 	if spec == nil {
 		return nil, errors.New("reflectEndpointInfo: spec is nil")
 	}
@@ -71,31 +72,21 @@ func reflectEndpointInfo(spec HandlerSpec, fnName string) (*EndpointInfo, error)
 			return nil, err
 		}
 	}
-	pkgName, handlerName := ifaceToPkgName(specTyp)
-	if !strings.Contains(pkgName, "/core/") {
-		err := errors.New("reflectEndpointInfo: spec is from outside /core/ package path")
-		return nil, err
-	}
-	serviceName, path := pkgToServicePath(pkgName)
+	_, handlerName := ifaceToPkgName(specTyp)
 	httpMethods := httpMethodsOf(spec)
 	endpoint := &EndpointInfo{
 		Service: serviceName,
-		Path:    fmt.Sprintf("%s/%s/%s", path, handlerName, fnName),
-		Methods: httpMethods[fnName],
+		Path:    fmt.Sprintf("/%s/%s", handlerName, fnName),
 		SpecTyp: specTyp,
 	}
-	return endpoint, nil
-}
-
-func reflectServiceName(spec HandlerSpec) (string, error) {
-	specTyp := reflect.TypeOf(spec)
-	pkgName, _ := ifaceToPkgName(specTyp)
-	if !strings.Contains(pkgName, "/core/") {
-		err := errors.New("reflectServiceName: spec is from outside /core/ package path")
-		return "", err
+	if methods, ok := httpMethods["*"]; ok {
+		// has a record that matches all endpoints
+		endpoint.Methods = methods
+	} else {
+		// otherwise use specific methods
+		endpoint.Methods = httpMethods[fnName]
 	}
-	serviceName, _ := pkgToServicePath(pkgName)
-	return serviceName, nil
+	return endpoint, nil
 }
 
 type EndpointInfo struct {
@@ -132,18 +123,11 @@ func (e *EndpointInfo) IsValidHandler(name string) bool {
 // var httpRequestTyp = reflect.TypeOf((*http.Request)(nil))
 var ginContextTyp = reflect.TypeOf((*gin.Context)(nil))
 
-func pkgToServicePath(pkg string) (service, path string) {
-	path = pkg[strings.Index(pkg, "/core/"):]
-	pathParts := strings.Split(path, "/")
-	service = "core_" + pathParts[len(pathParts)-1]
-	return
-}
-
-// ifacePkgName returns package path for an interface type.
-func ifaceToPkgName(typ reflect.Type) (pkg string, name string) {
+// ifacePkgName returns package path for an interface type, and the type's name.
+func ifaceToPkgName(typ reflect.Type) (pkgName string, typName string) {
 	implTyp := typ.Elem()
-	pkg = implTyp.PkgPath()
-	name = implTyp.Name()
+	pkgName = implTyp.PkgPath()
+	typName = implTyp.Name()
 	return
 }
 

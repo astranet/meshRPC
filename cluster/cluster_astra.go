@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -17,10 +18,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	log "github.com/sirupsen/logrus"
 
 	"github.com/astranet/astranet"
-	"github.com/astranet/galaxy/logging"
 )
 
 type AstraOptions struct {
@@ -39,29 +38,32 @@ func checkAstraOptions(opt *AstraOptions) *AstraOptions {
 	return opt
 }
 
-func NewAstraCluster(service string, opt *AstraOptions) Cluster {
+func NewAstraCluster(serviceName string, opt *AstraOptions) Cluster {
 	opt = checkAstraOptions(opt)
 	net := astranet.New().Router().WithEnv(opt.Tags...)
-	fields := log.Fields{
-		"layer":   "cluster",
-		"service": service,
-		"net_env": strings.Join(opt.Tags, "."),
-	}
-	log.WithFields(fields).Infoln("new astranet router created")
+	// fields := log.Fields{
+	// 	"layer":   "cluster",
+	// 	"service": serviceName,
+	// 	"net_env": strings.Join(opt.Tags, "."),
+	// }
+	// log.WithFields(fields).Infoln("new astranet router created")
 
 	if opt.Debug {
 		gin.SetMode(gin.DebugMode)
 	} else {
 		gin.SetMode(gin.ReleaseMode)
 	}
+	if len(serviceName) == 0 {
+		panic("empty service name")
+	}
 	c := &astraCluster{
-		fields: fields,
-		net:    net,
-		tags:   opt.Tags,
-		dbg:    opt.Debug,
+		// fields: fields,
+		net:  net,
+		tags: opt.Tags,
+		dbg:  opt.Debug,
 
-		service: service,
-		router:  gin.New(),
+		serviceName: serviceName,
+		router:      gin.New(),
 	}
 	c.initRouter()
 	if len(opt.Nodes) > 0 {
@@ -78,13 +80,13 @@ func (a *astraCluster) initRouter() {
 }
 
 type astraCluster struct {
-	fields log.Fields
-	net    astranet.AstraNet
-	tags   []string
-	dbg    bool
+	// fields log.Fields
+	net  astranet.AstraNet
+	tags []string
+	dbg  bool
 
-	service string
-	router  *gin.Engine
+	serviceName string
+	router      *gin.Engine
 }
 
 const defaultAstraPort = "11999"
@@ -107,18 +109,18 @@ func (a *astraCluster) Join(nodes []string) error {
 }
 
 func (a *astraCluster) ListenAndServe(addr string) error {
-	fnLog := log.WithFields(logging.WithFn(a.fields))
+	// fnLog := log.WithFields(logging.WithFn(a.fields))
 	host, port, err := net.SplitHostPort(addr)
 	if err != nil {
 		return newError(err, fmt.Sprintf("cluster: wrong hostport to listen and serve: %v", err))
 	}
 
-	fnLog.Infoln("binding", a.service, "as", serviceFQDN(a.service))
-	listener, err := a.net.Bind("", serviceFQDN(a.service))
+	// fnLog.Infoln("binding", a.serviceName, "as", serviceFQDN(a.serviceName))
+	listener, err := a.net.Bind("", serviceFQDN(a.serviceName))
 	if err != nil {
 		return err
 	}
-	fnLog.Infoln("ListenAndServe on", addr)
+	// fnLog.Infoln("ListenAndServe on", addr)
 	// expose internal HTTP router to the net using custom listener
 	go http.Serve(listener, a.router)
 
@@ -149,25 +151,25 @@ func newHTTPTransport(aNet astranet.AstraNet) *http.Transport {
 }
 
 func (a *astraCluster) ListenAndServeHTTP(addr string) error {
-	fnLog := log.WithFields(logging.WithFn(a.fields))
-	fnLog.Infoln("ListenAndServeHTTP on", addr)
+	// fnLog := log.WithFields(logging.WithFn(a.fields))
+	// fnLog.Infoln("ListenAndServeHTTP on", addr)
 	return http.ListenAndServe(addr, &httputil.ReverseProxy{
 		Transport:     newHTTPTransport(a.net),
 		FlushInterval: time.Millisecond * 10,
 		Director: func(req *http.Request) {
 			req.URL.Scheme = "http"
-			req.URL.Host = serviceFQDN(a.service)
+			req.URL.Host = serviceFQDN(a.serviceName)
 		},
 	})
 }
 
 func (a *astraCluster) Publish(spec HandlerSpec) error {
-	endpoints, err := reflectEndpoints(spec)
+	endpoints, err := reflectEndpoints(a.serviceName, spec)
 	if err != nil {
 		err = newError(err, fmt.Sprintf("cluster: failed to inspect provided HandlerSpec: %v", err))
 		return err
 	} else if len(endpoints) == 0 {
-		err := fmt.Errorf("cluster: provided HandlerSpec doesn't have any public http.HandlerFunc")
+		err := errors.New("cluster: provided HandlerSpec doesn't have any public http.HandlerFunc")
 		return err
 	}
 	for _, e := range endpoints {
@@ -187,8 +189,8 @@ func (a *astraCluster) Publish(spec HandlerSpec) error {
 	return nil
 }
 
-func (a *astraCluster) Wait(ctx context.Context, specs ...HandlerSpec) error {
-	fnLog := log.WithFields(logging.WithFn(a.fields))
+func (a *astraCluster) Wait(ctx context.Context, specs map[string]HandlerSpec) error {
+	// fnLog := log.WithFields(logging.WithFn(a.fields))
 	readyNames := make(map[string]struct{}, len(specs))
 	readyMux := new(sync.RWMutex)
 	allNames := make([]string, 0, len(specs))
@@ -201,24 +203,19 @@ func (a *astraCluster) Wait(ctx context.Context, specs ...HandlerSpec) error {
 		wg.Wait()
 		close(doneC)
 	}()
-	for _, spec := range specs {
-		go func(spec HandlerSpec) {
+	for serviceName, spec := range specs {
+		go func(serviceName string, spec HandlerSpec) {
 			defer wg.Done()
-			name, err := reflectServiceName(spec)
-			if err != nil {
-				fnLog.WithError(err).Warnln("skipping wait on %s", spec)
-				return
-			}
 			allMux.Lock()
-			allNames = append(allNames, name)
+			allNames = append(allNames, serviceName)
 			allMux.Unlock()
 			for {
-				switch state := a.pingService(ctx, name); state {
+				switch state := a.pingService(ctx, serviceName); state {
 				case stateCancelled, stateTimeout:
 					return
 				case stateReady:
 					readyMux.Lock()
-					readyNames[name] = struct{}{}
+					readyNames[serviceName] = struct{}{}
 					readyMux.Unlock()
 					return
 				default: // retry upon error
@@ -226,7 +223,7 @@ func (a *astraCluster) Wait(ctx context.Context, specs ...HandlerSpec) error {
 					continue
 				}
 			}
-		}(spec)
+		}(serviceName, spec)
 	}
 	select {
 	case <-doneC:
@@ -259,7 +256,7 @@ const (
 
 // pingService returns the serviceState for the provided service name.
 func (a *astraCluster) pingService(ctx context.Context, serviceName string) serviceState {
-	fnLog := log.WithFields(logging.WithFn(a.fields))
+	// fnLog := log.WithFields(logging.WithFn(a.fields))
 	cli := &http.Client{
 		Transport: newHTTPTransport(a.net),
 	}
@@ -268,7 +265,7 @@ func (a *astraCluster) pingService(ctx context.Context, serviceName string) serv
 	req = req.WithContext(ctx)
 	resp, err := cli.Do(req)
 	if err != nil {
-		fnLog.Debugln("pingService:", serviceName, err)
+		// fnLog.Debugln("pingService:", serviceName, err)
 		select {
 		case <-ctx.Done():
 			if ctx.Err() == context.Canceled {
@@ -285,19 +282,19 @@ func (a *astraCluster) pingService(ctx context.Context, serviceName string) serv
 	return stateReady
 }
 
-func (a *astraCluster) NewClient(spec HandlerSpec, nameOpt ...string) Client {
+func (a *astraCluster) NewClient(serviceName string, spec HandlerSpec, nameOpt ...string) Client {
 	var fnName string
 	if len(nameOpt) > 0 {
 		fnName = nameOpt[0]
 	}
-	endpoint, err := reflectEndpointInfo(spec, fnName)
+	endpoint, err := reflectEndpointInfo(serviceName, spec, fnName)
 	if err != nil {
 		panic(fmt.Errorf("cluster: failed to reflect target http.HandlerFunc: %v", err))
 	}
 	cli := &astraClient{
 		net:       a.net,
 		endpoint:  endpoint,
-		localhost: serviceFQDN(a.service),
+		localhost: serviceFQDN(a.serviceName),
 		cli: &http.Client{
 			Transport: newHTTPTransport(a.net),
 		},
@@ -436,5 +433,5 @@ func randTag(n int) string {
 }
 
 func serviceFQDN(service string) string {
-	return "galaxy." + service
+	return "meshrpc." + service
 }

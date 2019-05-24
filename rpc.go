@@ -9,7 +9,7 @@ import (
 func genRPCHandlerInterface(iface *MethodsCollection) string {
 	buf := new(bytes.Buffer)
 	iface.ForEachMethod(func(m *Method) error {
-		fmt.Fprintf(buf, "%s(c *gin.Context)\n", m.Name)
+		fmt.Fprintf(buf, "%s(ctx *gin.Context)\n", m.Name)
 		return nil
 	})
 	return buf.String()
@@ -37,46 +37,58 @@ func genServiceClientImplementation(recvName, featurePrefix string, iface *Metho
 
 func rpcHandlerMethod(recvName, featurePrefix string, m *Method) string {
 	buf := new(bytes.Buffer)
-	fmt.Fprintf(buf, "func (h *%s) %s(c *gin.Context) {\n", recvName, m.Name)
+	fmt.Fprintf(buf, "func (_handler *%s) %s(_ctx *gin.Context) {\n", recvName, m.Name)
 
 	// logging and metrics
-	fmt.Fprintln(buf, `metrics.ReportFuncCall(h.tags)
-	fnLog := log.WithFields(logging.WithFn(h.fields))
-	statsFn := metrics.ReportFuncTiming(h.tags)
-	defer statsFn()
+	fmt.Fprintln(buf, `// TODO: Report Stats + Timing
 	`)
 
 	// request decoding
-	fmt.Fprintf(buf, `var req %sRequest
-	decoder := json.NewDecoder(c.Request.Body)
-	err := decoder.Decode(&req)
-	if err != nil {
-		fnLog.Warnln(err)
-		bugsnag.Notify(err)
-		c.JSON(http.StatusBadRequest, &%sResponse{
-			%sErrorResponse: new%sErrorResponse(err),
+	fmt.Fprintf(buf, `var _req %sRequest
+	_decoder := json.NewDecoder(_ctx.Request.Body)
+	defer _ctx.Request.Body.Close()
+	_err := _decoder.Decode(&_req)
+	if _err != nil {
+		// TODO: Report Error
+
+		_data, _ := json.Marshal(&%sResponse{
+			ErrorResponse: %sErrorResponse{
+				Error: _err.Error(),
+			},
 		})
+		_ctx.Status(400)
+		// TODO: Report Stats
+		_, _  = io.Copy(_ctx.Writer, bytes.NewReader(_data))
 		return
-	}`, m.Name, m.Name, featurePrefix, featurePrefix)
+	}`, m.Name, m.Name, featurePrefix)
 	fmt.Fprintln(buf, "")
 
-	fmt.Fprintf(buf, "var resp %sResponse\n", m.Name)
+	fmt.Fprintf(buf, "var _resp %sResponse\n", m.Name)
 	fmt.Fprintf(buf, "%s\n", funcCallMapping(m))
 
 	// error handling
-	fmt.Fprintf(buf, `if err != nil {
-		fnLog.Warnln(err)
-		bugsnag.Notify(err)
-		c.JSON(http.StatusBadRequest, &%sResponse{
-			%sErrorResponse: new%sErrorResponse(err),
+	fmt.Fprintf(buf, `if _err != nil {
+		// TODO: Report Error
+
+		_data, _ := json.Marshal(&%sResponse{
+			ErrorResponse: %sErrorResponse{
+				Error: _err.Error(),
+			},
 		})
+		_ctx.Status(400)
+		// TODO: Report Stats
+		_, _  = io.Copy(_ctx.Writer, bytes.NewReader(_data))
 		return
-	}`, m.Name, featurePrefix, featurePrefix)
+	}`, m.Name, featurePrefix)
 	fmt.Fprintln(buf, "")
 
 	// response encoding
-	fmt.Fprintf(buf, `c.JSON(http.StatusOK, &resp)
-	return
+	fmt.Fprintf(buf, `
+		_data, _ := json.Marshal(&_resp)
+		_ctx.Status(200)
+		// TODO: Report Stats
+		_, _  = io.Copy(_ctx.Writer, bytes.NewReader(_data))
+		return
 	`)
 
 	fmt.Fprintln(buf, "}")
@@ -85,33 +97,31 @@ func rpcHandlerMethod(recvName, featurePrefix string, m *Method) string {
 
 func serviceClientMethod(recvName string, m *Method) string {
 	buf := new(bytes.Buffer)
-	fmt.Fprintf(buf, "func (s *%s) %s {\n", recvName, funcSpec(m, true))
+	fmt.Fprintf(buf, "func (_client *%s) %s {\n", recvName, funcSpec(m, true))
 
 	// logging and metrics
-	fmt.Fprintf(buf, `metrics.ReportFuncCall(s.tags)
-	statsFn := metrics.ReportFuncTiming(s.tags)
-	defer statsFn()`)
+	fmt.Fprintf(buf, `// TODO: Report Stats + Timing`)
 	fmt.Fprintln(buf, "\n")
 
 	// request mapping
-	fmt.Fprintf(buf, `req := %s`, reqFieldsMap(m))
-	fmt.Fprintf(buf, "var resp *%sResponse\n", m.Name)
+	fmt.Fprintf(buf, `_req := %s`, reqFieldsMap(m))
+	fmt.Fprintf(buf, "var _resp *%sResponse\n", m.Name)
 
 	// request
 	if !hasErr(m.Res) {
-		fmt.Fprintf(buf, `respBody, err := s.do(s.newReq("POST", "%s", req))`, m.Name)
+		fmt.Fprintf(buf, `_respBody, _err := _client.do(_client.newJsonReq("POST", "%s", _req))`, m.Name)
 	} else {
-		fmt.Fprintf(buf, "var respBody []byte\n")
-		fmt.Fprintf(buf, `respBody, err = s.do(s.newReq("POST", "%s", req))`, m.Name)
+		fmt.Fprintf(buf, "var _respBody []byte\n")
+		fmt.Fprintf(buf, `_respBody, _err = _client.do(_client.newJsonReq("POST", "%s", _req))`, m.Name)
 	}
 	fmt.Fprintln(buf, "")
 
 	// error handling
-	fmt.Fprintf(buf, `if err != nil {
+	fmt.Fprintf(buf, `if _err != nil {
 		return
-	} else if err = s.checkRespErr(respBody); err != nil {
+	} else if _err = _client.checkJsonRespErr(_respBody); _err != nil {
 		return
-	} else if json.Unmarshal(respBody, &resp); err != nil {
+	} else if json.Unmarshal(_respBody, &_resp); _err != nil {
 		return
 	}`)
 	fmt.Fprintln(buf, "")
@@ -176,9 +186,9 @@ func respFieldsMap(m *Method) string {
 			continue
 		}
 		if len(r.Name) == 0 {
-			fmt.Fprintf(buf, "_ret%d = resp.Ret%d\n", i, i)
+			fmt.Fprintf(buf, "_ret%d = _resp.Ret%d\n", i, i)
 		} else {
-			fmt.Fprintf(buf, "%s = resp.%s\n", r.Name, strings.Title(r.Name))
+			fmt.Fprintf(buf, "%s = _resp.%s\n", r.Name, strings.Title(r.Name))
 		}
 	}
 	return buf.String()
@@ -191,27 +201,27 @@ func funcCallMapping(m *Method) string {
 			// try nil or gtfo
 			paramList = append(paramList, "nil")
 		} else {
-			paramList = append(paramList, fmt.Sprintf("req.%s", strings.Title(p.Name)))
+			paramList = append(paramList, fmt.Sprintf("_req.%s", strings.Title(p.Name)))
 		}
 	}
 	paramSpec := strings.Join(paramList, ", ")
 	retList := make([]string, 0, len(m.Res))
 	for i, r := range m.Res {
 		if r.Type == "error" {
-			retList = append(retList, "err")
+			retList = append(retList, "_err")
 			continue
 		}
 		if len(r.Name) == 0 {
-			retList = append(retList, fmt.Sprintf("resp.Ret%d", i))
+			retList = append(retList, fmt.Sprintf("_resp.Ret%d", i))
 			continue
 		}
-		retList = append(retList, "resp."+strings.Title(r.Name))
+		retList = append(retList, "_resp."+strings.Title(r.Name))
 	}
 	retSpec := strings.Join(retList, ", ")
 	if len(m.Res) == 0 {
-		return fmt.Sprintf("h.svc.%s(%s)", m.Name, paramSpec)
+		return fmt.Sprintf("_handler.svc.%s(%s)", m.Name, paramSpec)
 	}
-	return fmt.Sprintf("%s = h.svc.%s(%s)", retSpec, m.Name, paramSpec)
+	return fmt.Sprintf("%s = _handler.svc.%s(%s)", retSpec, m.Name, paramSpec)
 }
 
 func funcSpec(m *Method, forceNaming bool) string {
@@ -223,7 +233,7 @@ func funcSpec(m *Method, forceNaming bool) string {
 		if len(ret.Name) == 0 {
 			if forceNaming {
 				if ret.Type == "error" {
-					retSpec = "(err error)"
+					retSpec = "(_err error)"
 				} else {
 					retSpec = fmt.Sprintf("(_ret0 %s)", ret.Type)
 				}
@@ -232,7 +242,7 @@ func funcSpec(m *Method, forceNaming bool) string {
 			}
 		} else {
 			if ret.Type == "error" && forceNaming {
-				retSpec = fmt.Sprintf("(err %s)", ret.Type)
+				retSpec = fmt.Sprintf("(_err %s)", ret.Type)
 			} else {
 				retSpec = fmt.Sprintf("(%s %s)", ret.Name, ret.Type)
 			}
@@ -243,7 +253,7 @@ func funcSpec(m *Method, forceNaming bool) string {
 			if forceNaming {
 				for i, r := range m.Res {
 					if r.Type == "error" {
-						rets = append(rets, fmt.Sprintf("err %s", r.Type))
+						rets = append(rets, fmt.Sprintf("_err %s", r.Type))
 					} else {
 						rets = append(rets, fmt.Sprintf("_ret%d %s", i, r.Type))
 					}
@@ -256,7 +266,7 @@ func funcSpec(m *Method, forceNaming bool) string {
 		} else {
 			for _, r := range m.Res {
 				if r.Type == "error" && forceNaming {
-					rets = append(rets, "err "+r.Type)
+					rets = append(rets, "_err "+r.Type)
 				} else {
 					rets = append(rets, r.Name+" "+r.Type)
 				}
