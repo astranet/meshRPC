@@ -1,11 +1,27 @@
 # Mesh RPC
 
-Automatic Service Mesh generator for pure Go micro services, a humble alternative to gRPC! A service mesh is a dedicated infrastructure layer for managing service-to-service communication, including RPC over HTTP. The `meshRPC` tool paired with `cluster` package is able to transform any type of legacy Go service into a "new stack" operator's dream.
+MeshRPC is an automatic Service Mesh generator for pure Go micro services, it's a humble alternative to gRPC! In a nutshell, a Service Mesh is an inter-service communication infrastructure, including RPC over HTTP.
 
-Even for such legacy services that contain many layers inside a single process, this framework can be used to decouple things,
-using interface substitution. Consider an `interface A`, then use this tool to generate a microservice that implements `interface A`, but once called, instead of `interface A` invocation, there will be an RPC call over network to the corresponding microservice. In this way you can separate a big project by small pieces without hurting integrity (just adding a bit of network latency).
+_With a service mesh,_
 
-All generated microservices require zero-configuration and are load-balanced (round robin with sticky sessions) out of the box!
+* A given Microservice won’t directly communicate with the other microservices.
+Rather all service-to-service communications will take places on-top of a software component called service mesh.
+
+* Service Mesh provides built-in support for some network functions such as resiliency, tracing, service discovery, etc.
+
+* Therefore, service developers can focus more on the business logic while most of the work related to network communication is offloaded to the service mesh.
+
+See [this article](https://medium.com/microservices-in-practice/service-mesh-for-microservices-2953109a3c9a) for a good explanation about this emerging concept, in terms of gRPC and Kubernetes.
+
+The `meshRPC` tool paired with `cluster` package is able to transform any type of legacy Go service into a "new stack" developer's dream, without adding too much cost to infrastructure.
+
+All meshRPC-infused microservices require zero-configuration and are load-balanced (round robin with sticky sessions) out of the box!
+
+#### What about legacy monoliths? Should I rewrite 100%?
+
+Of course not! Even for legacy Go monoliths that contain many layers inside a single process, `meshRPC` framework can be used to decouple things, using interface substitution. Consider an `interface A`, then use this tool to generate a microservice that implements `interface A`, but once called, instead of `interface A` invocation, there will be an RPC call over network to the corresponding microservice. In this way you can separate a big project by small pieces without hurting integrity (just adding a bit of network latency).
+
+And you don't need to write RPC models and new data structures, we will generate them for you.
 
 ### Install
 
@@ -332,7 +348,6 @@ Check if everything started correctly:
 
 ```
 CONTAINER ID   IMAGE                                           NAMES
-============   =============================================   ====================================================
 e0cde9c1ce9d   docker.direct/meshrpc/example/greeter:latest    meshrpc-example_greeter.1.olhmh4ho2kvqck37zm7qm3zbt
 767aee3bd128   docker.direct/meshrpc/example/mesh_api:latest   meshrpc-example_mesh-api.1.dzee3mvff6a3duzejeb1gg0q1
 ```
@@ -348,7 +363,6 @@ Works flawlessly! See the logs of the docker (the `greeter` container):
 
 ```
 $ docker logs -f e0cde9c1ce9d
-=============================
 [GIN] 2019/05/24 - 19:06:58 | 200 |        15.6µs |    EvbuE1rKRY0A | GET      /ping
 [GIN] 2019/05/24 - 19:09:41 | 200 |       106.9µs |      10.255.0.2 | GET      /handler/Check
 [GIN] 2019/05/24 - 19:09:42 | 200 |        62.5µs |      10.255.0.2 | GET      /handler/Check
