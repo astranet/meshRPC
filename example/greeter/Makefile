@@ -6,7 +6,7 @@ IMAGE_NAME := "docker.direct/meshrpc/example/greeter"
 CURRDIR=$(PWD)
 
 image:
-	docker build --build-arg GIT_HASH=$(GIT_HASH) -t $(IMAGE_NAME):local -f Dockerfile .
+	docker build --build-arg GIT_HASH=$(GIT_HASH) -t $(IMAGE_NAME):local -f Dockerfile ../..
 	docker tag $(IMAGE_NAME):local $(IMAGE_NAME):$(GIT_HASH)
 	docker tag $(IMAGE_NAME):local $(IMAGE_NAME):latest
 
