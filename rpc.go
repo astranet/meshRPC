@@ -52,7 +52,7 @@ func rpcHandlerMethod(recvName, featurePrefix string, m *Method) string {
 		// TODO: Report Error
 
 		_data, _ := json.Marshal(&%sResponse{
-			ErrorResponse: %sErrorResponse{
+			%sErrorResponse: %sErrorResponse{
 				Error: _err.Error(),
 			},
 		})
@@ -60,7 +60,7 @@ func rpcHandlerMethod(recvName, featurePrefix string, m *Method) string {
 		// TODO: Report Stats
 		_, _  = io.Copy(_ctx.Writer, bytes.NewReader(_data))
 		return
-	}`, m.Name, m.Name, featurePrefix)
+	}`, m.Name, m.Name, featurePrefix, featurePrefix)
 	fmt.Fprintln(buf, "")
 
 	fmt.Fprintf(buf, "var _resp %sResponse\n", m.Name)
@@ -71,7 +71,7 @@ func rpcHandlerMethod(recvName, featurePrefix string, m *Method) string {
 		// TODO: Report Error
 
 		_data, _ := json.Marshal(&%sResponse{
-			ErrorResponse: %sErrorResponse{
+			%sErrorResponse: %sErrorResponse{
 				Error: _err.Error(),
 			},
 		})
@@ -79,7 +79,7 @@ func rpcHandlerMethod(recvName, featurePrefix string, m *Method) string {
 		// TODO: Report Stats
 		_, _  = io.Copy(_ctx.Writer, bytes.NewReader(_data))
 		return
-	}`, m.Name, featurePrefix)
+	}`, m.Name, featurePrefix, featurePrefix)
 	fmt.Fprintln(buf, "")
 
 	// response encoding
