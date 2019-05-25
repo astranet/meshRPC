@@ -399,7 +399,9 @@ At this point out tutorial and example section is over. We kindly forwarding you
 
 ### Benchmarks
 
-TODO. Stay tuned :)
+[MeshRPC Benchmark Suite](https://github.com/astranet/meshRPC-benchmark)
+
+**1.8 ms** per call is the current latency using `docker stack` on local machine and virtual network.
 
 ### Fixing templates
 
