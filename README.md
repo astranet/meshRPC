@@ -55,9 +55,19 @@ type service struct{}
 
 Make sure to implement the methods, they will be exposed to other microservices in cluster soon. See an example [service.go](https://github.com/astranet/meshRPC/tree/master/example/greeter/service/service.go).
 
-Now run `meshRPC expose` or using `go generate`, please note that when running manually, you must specify project dir and the target sources path as arguments.
+Now run `meshRPC expose` or using `go generate`, please note that when running manually, you must specify project dir and the target sources path as arguments. If you have multiple service interfaces in the same package, called for example `FooService` and `BarService`, there `Foo` and `Bar` are module prefixes, provide them using an additional flag `-M` on each expose call.
 
 ```
+Usage: meshRPC expose -P [-M] [-y] [SRC]
+
+Arguments:
+  SRC                   Target Go source file or a package with service definitions. (default ".")
+
+Options:
+  -P, --pkg-name        Must specify the package name. (default "foo")
+  -M, --module-prefix   Optional feature prefix to distinguish multiple service interfaces in the same package.
+  -y, --yes             Agree to all prompts automatically.
+
 $ meshRPC -R . expose -P greeter service/
 
 Actions to be committed
