@@ -409,10 +409,14 @@ At this point our tutorial and example section is over. We kindly forwarding you
 
 ### Benchmarks
 
-[MeshRPC Benchmark Suite](https://github.com/astranet/meshRPC-benchmark)
+Using `docker stack` and [MeshRPC Benchmark Suite](https://github.com/astranet/meshRPC-benchmark):
 
-**1.8 ms** per call is the current latency using `docker stack` on local machine and virtual network.
-Tested on 2014 Macbook Pro (2,8 GHz Intel Core i5).
+* Non-RPC calls:
+  - Macbook Pro 2014 (2,8 GHz Intel Core i5): **33,3 µs** per call
+  - Linux 4.15.0-47-generic (Intel Xeon CPU E3-1270 v6 @ 3.80GHz): **0,235 µs** per call
+* RPC calls:
+  - Macbook Pro 2014 (2,8 GHz Intel Core i5): **1,8 ms** per RPC call
+  - Linux 4.15.0-47-generic (Intel Xeon CPU E3-1270 v6 @ 3.80GHz): **197,4 µs** per RPC call
 
 ### Fixing templates
 
