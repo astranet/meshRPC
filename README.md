@@ -89,7 +89,7 @@ func() {
             *clusterName,
         },
         Nodes: *clusterNodes,
-        // Debug: true,
+        Debug: true,
     })
     // Init a new service instance (that is your code)
     service := greeter.NewService()
@@ -126,7 +126,7 @@ func() {
             *clusterName,
         },
         Nodes: *clusterNodes,
-        // Debug: true,
+        Debug: true,
     })
     // Listen on a TCP address, this address can be used
     // by other peers to discover each other in this cluster.
