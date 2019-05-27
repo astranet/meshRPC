@@ -40,8 +40,7 @@ func rpcHandlerMethod(recvName, featurePrefix string, m *Method) string {
 	fmt.Fprintf(buf, "func (_handler *%s) %s(_ctx *gin.Context) {\n", recvName, m.Name)
 
 	// logging and metrics
-	fmt.Fprintln(buf, `// TODO: Report Stats + Timing
-	`)
+	fmt.Fprintf(buf, "// TODO: Report Stats + Timing\n\n")
 
 	// request decoding
 	fmt.Fprintf(buf, `var _req %sRequest

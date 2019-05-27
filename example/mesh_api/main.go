@@ -80,7 +80,7 @@ func httpListenAndServe(c cluster.Cluster) {
 	})
 	// Init a new meshRPC client to the greeter service.
 	greeterClient := c.NewClient("greeter", greeter.RPCHandlerSpec)
-	// A greeter.ServiceClient instance sucessfully conforms the greeter.Service interface
+	// A greeter.ServiceClient instance successfully conforms the greeter.Service interface
 	// and may be used in place of the local greeter.Service instance.
 	var svc greeter.Service = greeter.NewServiceClient(greeterClient, nil)
 

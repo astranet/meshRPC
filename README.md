@@ -1,4 +1,6 @@
-# Mesh RPC
+# Mesh RPC [![Go Report Card](https://goreportcard.com/badge/github.com/astranet/meshRPC)](https://goreportcard.com/report/github.com/astranet/meshRPC) ![Version Beta](https://img.shields.io/badge/version-beta-blue.svg)
+
+<img alt="meshRPC logo, image author - MariaLetta/free-gophers-pack" src="https://cl.ly/0f19c50a98df/51.png" width="250px" />
 
 MeshRPC is an automatic Service Mesh generator for pure Go micro services, it's a humble alternative to gRPC! In a nutshell, a Service Mesh is an inter-service communication infrastructure, including RPC over HTTP.
 

@@ -154,7 +154,7 @@ func (p Pkg) params(field *ast.Field) []Param {
 	}
 	// Handle anonymous params
 	if len(params) == 0 {
-		params = []Param{Param{Type: typ}}
+		params = []Param{{Type: typ}}
 	}
 	return params
 }

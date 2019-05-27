@@ -32,7 +32,7 @@ var HandlerSpec Handler = &handler{}
 // to the meshRPC cluster.
 func (h *handler) HTTPMethodsMap() map[string][]string {
 	return map[string][]string{
-		"Check": []string{
+		"Check": {
 			"GET",
 		},
 	}
