@@ -43,31 +43,27 @@ type Service interface {
     SendPostcard(card *Postcard) error
 }
 
-// Then implement methods for the service.
-// See https://github.com/astranet/meshRPC/tree/master/example/greeter/service/service.go
-
 func NewService() Service {
     return &service{}
 }
 
 type service struct{}
+
+func (s *service) Greet(name string) (string, error) {
+    // TODO
+}
+
+func (s *service) SendPostcard(card *Postcard) error {
+    // TODO
+}
+
 ```
 
-Make sure to implement the methods, they will be exposed to other microservices in cluster soon. See an example [service.go](https://github.com/astranet/meshRPC/tree/master/example/greeter/service/service.go).
+Make sure to implement the methods, they will be exposed to other microservices in cluster soon. See the full [example/greeter/service/service.go](https://github.com/astranet/meshRPC/tree/master/example/greeter/service/service.go) for the reference.
 
-Now run `meshRPC expose` or using `go generate`, please note that when running manually, you must specify project dir and the target sources path as arguments. If you have multiple service interfaces in the same package, called for example `FooService` and `BarService`, there `Foo` and `Bar` are module prefixes, provide them using an additional flag `-M` on each expose call.
+Now run `meshRPC expose` or using `go generate`, please note that when running manually, you must specify project dir and the target sources path as arguments. Also, if you have multiple service interfaces in the same package, called for example `FooService` and `BarService`, then `Foo` and `Bar` are module prefixes and should be provided using an additional flag `-M` on each expose call.
 
 ```
-Usage: meshRPC expose -P [-M] [-y] [SRC]
-
-Arguments:
-  SRC                   Target Go source file or a package with service definitions. (default ".")
-
-Options:
-  -P, --pkg-name        Must specify the package name. (default "foo")
-  -M, --module-prefix   Optional feature prefix to distinguish multiple service interfaces in the same package.
-  -y, --yes             Agree to all prompts automatically.
-
 $ meshRPC -R . expose -P greeter service/
 
 Actions to be committed
@@ -83,7 +79,7 @@ queue.go:44: Action#3: overwrite file [project]/service/client_gen.go with 123 l
 
 Service is complete! Let's create a simple server that will handle cluster connections.
 
-### Example
+#### Connect to cluster
 
 ```go
 func() {
@@ -93,15 +89,15 @@ func() {
             *clusterName,
         },
         Nodes: *clusterNodes,
-        Debug: true,
+        // Debug: true,
     })
-
     // Init a new service instance (that is your code)
     service := greeter.NewService()
     // Init an RPC handler (that is the generated meshRPC code)
     meshRPC := greeter.NewRPCHandler(service, nil)
     // Publish RPC handlers on the cluster.
     c.Publish(meshRPC)
+
     // Bonus: publish your own HTTP handler too:
     handler := greeter.NewHandler()
     c.Publish(handler)
@@ -114,13 +110,13 @@ func() {
 }
 ```
 
-See the full example [main.go](https://github.com/astranet/meshRPC/tree/master/example/greeter/main.go) that just populates config values. It took just a few lines to expose the service over network, as well as your custom HTTP endpoints. But, the question is, how to access those endpoints? For debugging purposes it's easy to also use `c.ListenAndServeHTTP` that will start an usual HTTP server in the same process, so you could connect to `greeter` instance directly. But that's not robust, because you want to have an API Gateway with load balancing and authorization, am I right? :)
+See the full [example/greeter/main.go](https://github.com/astranet/meshRPC/tree/master/example/greeter/main.go) that populates config values and starts a server. It took just a few lines to expose the service over network, as well as your custom HTTP endpoints. But, the question is, how to access those endpoints? For debugging purposes it's easy to also use `c.ListenAndServeHTTP` that will start an usual HTTP server in the same process, so you could connect to `greeter` instance directly. But that's not robust, because you want to have an API Gateway with load balancing and authorization, am I right? :)
 
 At this point users that would use gRPC usually put an [Envoy](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/grpc) instance that will automatically convert HTTP/2 gRPC protobufs into HTTP/1.1 JSONs. You're expected to write an Envoy config and an xDS discovery service or install [Istio](https://istio.io/docs/concepts/security/) with automatic sidecar injection, on your Kubernetes cluster. I wish you luck.
 
 #### API Gateway for meshRPC
 
-We'll create a simple server that will look like an HTTP server, but it will also be a cluster discovery endpoint. All service nodes you will start will simply connect to it, and register within the cluster. Actually, any service node may connect to any other service node to get into the mesh. MeshRPC initiates persistent TCP connections between peers, and all virtual connections and streams are multiplexed on these persistent conns. This is how [AstraNet](https://github.com/astranet/astranet) cluster works.
+We'll create a simple server that will act as an HTTP server, but it will also be a cluster discovery endpoint. All service nodes you will start will simply connect to it in order to discover each other. Actually, any service node may connect to any other service node to get into the mesh. MeshRPC initiates persistent TCP connections between peers, and all virtual connections and streams are multiplexed on these persistent conns. This is how [AstraNet](https://github.com/astranet/astranet) cluster works.
 
 ```go
 func() {
@@ -130,15 +126,13 @@ func() {
             *clusterName,
         },
         Nodes: *clusterNodes,
-        Debug: true,
+        // Debug: true,
     })
-    go func() {
-        // Listen on a TCP address, this address can be used
-        // by other peers to discover each other in this cluster.
-        if err := c.ListenAndServe(*netAddr); err != nil {
-            closer.Fatalln(err)
-        }
-    }()
+    // Listen on a TCP address, this address can be used
+    // by other peers to discover each other in this cluster.
+    if err := c.ListenAndServe(*netAddr); err != nil {
+        closer.Fatalln(err)
+    }
 
     // Start a normal Gin HTTP server that will use cluster endpoints.
     httpListenAndServe(c)
@@ -148,25 +142,29 @@ func httpListenAndServe(c cluster.Cluster) {
     // Init default Gin router
     router := gin.Default()
     // Wait until greeter service dependency is available.
-    wait(c, greeter.RPCHandlerSpec)
+    wait(c, map[string]cluster.HandlerSpec{
+        "greeter": greeter.RPCHandlerSpec,
+    })
     // Init a new meshRPC client to the greeter service.
-    greeterClient := c.NewClient(greeter.RPCHandlerSpec)
+    greeterClient := c.NewClient("greeter", greeter.RPCHandlerSpec)
     // A greeter.ServiceClient instance sucessfully conforms the greeter.Service interface
     // and may be used in place of the local greeter.Service instance.
     var svc greeter.Service = greeter.NewServiceClient(greeterClient, nil)
 
     // Set an endpoint handler for the Greet function.
     // Example Request:
+    // $ curl http://localhost:8282/greeter/greet/Max
     router.GET("/greeter/greet/:name", func(c *gin.Context) {
         // Service call is actually done over meshRPC...
         message, err := svc.Greet(c.Param("name"))
+        if err != nil {
+            c.JSON(500, err.Error())
 
 // See the rest in:
 // https://github.com/astranet/meshRPC/tree/master/example/mesh_api/main.go
 ```
 
-See the full example [main.go](https://github.com/astranet/meshRPC/tree/master/example/mesh_api/main.go) to get the idea.
-It takes just a few lines more to create an API Gateway for the whole cluster. Make sure that `:11999` port is closed from ouside connections, but `:8282` is okay to be exposed, or connected to classic reverse proxies such as Nginx and Caddy for TLS.
+See the full [example/mesh_api/main.go](https://github.com/astranet/meshRPC/tree/master/example/mesh_api/main.go) to get the idea of a minimal API gateway. It took just a few lines more to create an API gateway for the whole cluster. Make sure that `:11999` port is closed from ouside connections, but `:8282` is okay to be exposed, or connected to classic reverse proxies such as Nginx and Caddy for TLS.
 
 ### Example Run
 
@@ -258,7 +256,7 @@ All ok! 2019-05-24T16:29:04+03:00
 
 This has been a "legacy" HTTP endpoint that greeter service exposed before. But now it is accessed
 using unified API surface of `mesh_api`, with RPC telemetry, logging and (possible) security and
-other stuff attached to it. See [greeter/service/handlers.go](https://github.com/astranet/meshRPC/tree/master/example/greeter/service/handlers.go) example on what has been added before it could be exposed (spoiler: almost nothing at all).
+other stuff attached to it. See [example/greeter/service/handlers.go](https://github.com/astranet/meshRPC/tree/master/example/greeter/service/handlers.go) example on what has been added before it could be exposed (spoiler: almost nothing at all).
 
 A final example of complex data transfer between two services:
 
@@ -310,7 +308,7 @@ $ docker pull docker.direct/meshrpc/example/mesh_api
 
 First, we need a `docker-compose.yml` that contains a simple definition. Here we use docker images generated before, and we set cluster node list using an environment variable `MESHRPC_CLUSTER_NODES`. We'll expose only `8282` port for the API Gateway. Virtual net allows to reference hosts by their nodes easily, however, if you want to use host net just make sure to avoid port collision for `mesh_api` and other nodes.
 
-```
+```yaml
 version: "3"
 services:
   mesh-api:
