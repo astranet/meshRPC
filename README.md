@@ -112,7 +112,7 @@ func() {
 
 See the full [example/greeter/main.go](https://github.com/astranet/meshRPC/tree/master/example/greeter/main.go) that populates config values and starts a server. It took just a few lines to expose the service over network, as well as your custom HTTP endpoints. But, the question is, how to access those endpoints? For debugging purposes it's easy to also use `c.ListenAndServeHTTP` that will start an usual HTTP server in the same process, so you could connect to `greeter` instance directly. But that's not robust, because you want to have an API Gateway with load balancing and authorization, am I right? :)
 
-At this point users that would use gRPC usually put an [Envoy](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/grpc) instance that will automatically convert HTTP/2 gRPC protobufs into HTTP/1.1 JSONs. You're expected to write an Envoy config and an xDS discovery service or install [Istio](https://istio.io/docs/concepts/security/) with automatic sidecar injection, on your Kubernetes cluster. I wish you luck.
+At this point users that would use gRPC usually put an [Envoy](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/grpc) instance that will automatically convert HTTP/2 gRPC protobufs into HTTP/1.1 JSONs. You're expected to write an Envoy config and an xDS discovery service or install [Istio](https://istio.io/docs/concepts/security/) with automatic sidecar injection, on your Kubernetes cluster. It might be time consuming.
 
 #### API Gateway for meshRPC
 
@@ -172,9 +172,9 @@ At this moment we have:
 * `github.com/astranet/meshRPC/example/greeter` that is a server executable exposing service to meshRPC cluster.
 * `github.com/astranet/meshRPC/example/mesh_api` that is an API Gateway for all meshRPC services in this cluster.
 
-Let's run the API Gateway we just created:
+Let's run our API Gateway we just created:
 ```
-go install github.com/astranet/meshRPC/example/mesh_api
+$ go install github.com/astranet/meshRPC/example/mesh_api
 $ mesh_api
 
 [GIN-debug] GET    /ping                     --> github.com/astranet/meshRPC/cluster.okLoopback.func1 (2 handlers)
@@ -247,16 +247,16 @@ $ curl -d'{"name": "Max"}' http://localhost:8282/greeter/greet
 {"error":"","message":"Hello, Max"}
 ```
 
-This has been an internal RPC endpoint, but it is exposed as part of API surface: you're talking directly to a `greeter` node directly, but using our `mesh_api` gateway as an entrypoint. Please note, that if RPC protocol's data serialization method is other than JSON, for example Protobuf or Cap'n'proto, that means you will deal with binary data.
+This is an internal RPC endpoint, but it is exposed as part of API surface: you're talking directly to a `greeter` node, but using your `mesh_api` gateway as an entrypoint. Please note, that if data serialization protocol is other than JSON, Protobuf for example, it means you will deal with binary data.
 
 ```
 $ curl http://localhost:8282/greeter/check
 All ok! 2019-05-24T16:29:04+03:00
 ```
 
-This has been a "legacy" HTTP endpoint that greeter service exposed before. But now it is accessed
-using unified API surface of `mesh_api`, with RPC telemetry, logging and (possible) security and
-other stuff attached to it. See [example/greeter/service/handlers.go](https://github.com/astranet/meshRPC/tree/master/example/greeter/service/handlers.go) example on what has been added before it could be exposed (spoiler: almost nothing at all).
+This is the "legacy" HTTP endpoint that `greeter` service always had. But it is exposed
+using unified API surface of `mesh_api` now, with RPC telemetry, logging and (possibly some) security and
+other stuff attached to it. See an [example/greeter/service/handlers.go](https://github.com/astranet/meshRPC/tree/master/example/greeter/service/handlers.go) for a demo on how to expose legacy HTTP endpoints, almost no changes are required.
 
 A final example of complex data transfer between two services:
 
@@ -272,11 +272,11 @@ sending greeter.Postcard{PictureURL:"", Address:"World", Recipient:"Max", Messag
 [GIN] 2019/05/24 - 16:35:16 | 200 |      295.19µs |    Y7F51Lq8xN0A | POST     /rpcHandler/SendPostcard
 ```
 
-Great! Next we need to do is orchestration and scaling.
+Great! Next we do orchestration and scaling.
 
-### Usage: Dockerfiles
+### Dockerization and scaling
 
-Let's create a simple `Dockerfile` that creates minimalistic Alpine containers. This is up to you what method to use in parctice, for example in some project I use golang's base image because I need a lot of dependencies that don't exist in Alpine.
+Let's create a simple `Dockerfile` that creates minimalistic Alpine containers. This is up to you which method to use in practice, for example in some project I'd use Go's base image because I need a lot of dependencies that don't exist in Alpine.
 
 ```
 FROM golang:1.12-alpine as builder
@@ -295,18 +295,18 @@ EXPOSE 11999
 ENTRYPOINT ["greeter"]
 ``` 
 
-A similar [Dockerfile](https://github.com/astranet/meshRPC/tree/master/example/mesh_api/Dockerfile) has been made for `mesh_api` too. It just exposes both ports instead of one. Note - for real apps you should vendoring or Go modules instead of simple go get.
+A similar [Dockerfile](https://github.com/astranet/meshRPC/tree/master/example/mesh_api/Dockerfile) has been made for `mesh_api` too. Note: for real apps you should use vendoring or Go modules instead of simple `go get` in Dockefile.
 
-To get both containers as we built it, use
+To get both containers that we've built, use
 
 ```
 $ docker pull docker.direct/meshrpc/example/greeter
 $ docker pull docker.direct/meshrpc/example/mesh_api
 ```
 
-### Usage: Docker Compose (also Docker Stack)
+#### Docker Stack (ex docker-compose)
 
-First, we need a `docker-compose.yml` that contains a simple definition. Here we use docker images generated before, and we set cluster node list using an environment variable `MESHRPC_CLUSTER_NODES`. We'll expose only `8282` port for the API Gateway. Virtual net allows to reference hosts by their nodes easily, however, if you want to use host net just make sure to avoid port collision for `mesh_api` and other nodes.
+First, we need `docker-compose.yml` that contains a simple definition. Here we use docker images generated from above, and we set cluster node list using an environment variable `MESHRPC_CLUSTER_NODES` that will be read by our example applications. We'll expose only `8282` port for the API Gateway access. Virtual net allows to reference nodes by their service names only, however, if you want to use host net just make sure to avoid port collision for `mesh_api` and other nodes, and use full addresses.
 
 ```yaml
 version: "3"
@@ -339,7 +339,7 @@ networks:
   meshnet:
 ```
 
-Let's run this stack, you can use old good `docker-compose` but for future's sake I'll use `docker stack` here.
+Let's run this stack, you can use good old `docker-compose` but for the future's sake I'll use `docker stack` here.
 
 ```
 $ docker stack deploy -c docker-compose.yml meshrpc-example
@@ -352,7 +352,7 @@ NAME                SERVICES            ORCHESTRATOR
 meshrpc-example     2                   Swarm
 ```
 
-Check if everything started correctly:
+Check if everything has started correctly:
 
 ```
 CONTAINER ID   IMAGE                                           NAMES
@@ -367,7 +367,7 @@ $ curl http://localhost:8282/greeter/check
 All ok! 2019-05-24T19:09:42Z
 ```
 
-Works flawlessly! See the logs of the docker (the `greeter` container): 
+Works flawlessly! Check the docker logs (the `greeter` container): 
 
 ```
 $ docker logs -f e0cde9c1ce9d
@@ -377,7 +377,7 @@ $ docker logs -f e0cde9c1ce9d
 [GIN] 2019/05/24 - 19:09:42 | 200 |       350.6µs |      10.255.0.2 | GET      /handler/Check
 ```
 
-Maybe scale a little bit?
+Maybe scale the service a little?
 
 ```
 $ docker service scale meshrpc-example_greeter=5
@@ -391,7 +391,7 @@ overall progress: 5 out of 5 tasks
 verify: Service converged
 ```
 
-And check the load balancing after querying the API Gateway. Nodes become available almost immediately, and require no warmp. Nodes can be taken down without hanging connections.
+And check the load balancing after querying the API Gateway. Nodes become available almost immediately, and require no warmup. Nodes can be taken down without hanging connections.
 
 ```
 meshrpc-example_greeter.1.olhmh4ho2kvq    | [GIN] | 200 |       287.5µs |      10.255.0.2 | GET      /handler/Check
@@ -403,13 +403,14 @@ meshrpc-example_greeter.5.t900isxh3568    | [GIN] | 200 |       175.5µs |      
 meshrpc-example_greeter.5.t900isxh3568    | [GIN] | 200 |       304.3µs |      10.255.0.2 | GET      /handler/Check
 ```
 
-At this point out tutorial and example section is over. We kindly forwarding you to [meshRPC/example](https://github.com/astranet/meshRPC/tree/master/example) for reference implementation and a playground for starting your cluster.
+At this point our tutorial and example section is over. We kindly forwarding you to [example](https://github.com/astranet/meshRPC/tree/master/example) dir for reference implementation and a playground for starting your cluster.
 
 ### Benchmarks
 
 [MeshRPC Benchmark Suite](https://github.com/astranet/meshRPC-benchmark)
 
 **1.8 ms** per call is the current latency using `docker stack` on local machine and virtual network.
+Tested on 2014 Macbook Pro (2,8 GHz Intel Core i5).
 
 ### Fixing templates
 
