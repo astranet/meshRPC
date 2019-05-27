@@ -2,7 +2,7 @@
 
 <img alt="meshRPC logo, image author - MariaLetta/free-gophers-pack" src="https://cl.ly/0f19c50a98df/51.png" width="250px" />
 
-MeshRPC provides automatic Service Mesh and RPC generation for Go micro services, it's a humble alternative to gRPC with Istio. In a nutshell, a Service Mesh is an inter-service communication infrastructure, that includes but not limited to RPC protocol and additional client/server instances. This tool is a framework for quick onboardings onto meshy things.
+MeshRPC provides automatic Service Mesh and RPC generation for Go micro services, it's a humble alternative to gRPC with Istio. In a nutshell, a Service Mesh is an inter-service communication infrastructure, that includes adding an RPC protocol and additional client/server capabilities to existing services. This tool is a framework for quick onboardings onto meshy things.
 
 _With a service mesh,_
 
@@ -25,7 +25,7 @@ Of course not! Even for legacy Go monoliths that contain many layers inside a si
 
 And you don't need to write RPC models and new data structures, we will generate them for you.
 
-### What about gRPC? Why do you keep comparing it with gRPC?
+#### What about gRPC? Why do you keep comparing it with gRPC?
 
 See, MeshRPC also does the same job that gRPC does. It takes a contract (Go interface instead of a protobuf schema) and generates both RPC client/server code allowing services to call each other over network, with streaming support as well. It is not cross-language and cross-platform yet, unlike gRPC, that's a simplification for now. Most of this package is focused on proper RPC generation and optimization, rather than service discovery and load balancing, with [AstraNet](http://github.com/astranet/astranet) being the core behind networking.
 
