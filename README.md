@@ -2,7 +2,7 @@
 
 <img alt="meshRPC logo, image author - MariaLetta/free-gophers-pack" src="https://cl.ly/0f19c50a98df/51.png" width="250px" />
 
-MeshRPC is an automatic Service Mesh generator for pure Go micro services, it's a humble alternative to gRPC! In a nutshell, a Service Mesh is an inter-service communication infrastructure, including RPC over HTTP.
+MeshRPC provides automatic Service Mesh and RPC generation for Go micro services, it's a humble alternative to gRPC with Istio. In a nutshell, a Service Mesh is an inter-service communication infrastructure, that includes but not limited to RPC protocol and additional client/server instances. This tool is a framework for quick onboardings onto meshy things.
 
 _With a service mesh,_
 
@@ -24,6 +24,10 @@ All meshRPC-infused microservices require zero-configuration and are load-balanc
 Of course not! Even for legacy Go monoliths that contain many layers inside a single process, `meshRPC` framework can be used to decouple things, using interface substitution. Consider an `interface A`, then use this tool to generate a microservice that implements `interface A`, but once called, instead of `interface A` invocation, there will be an RPC call over network to the corresponding microservice. In this way you can separate a big project by small pieces without hurting integrity (just adding a bit of network latency).
 
 And you don't need to write RPC models and new data structures, we will generate them for you.
+
+### What about gRPC? Why do you keep comparing it with gRPC?
+
+See, MeshRPC also does the same job that gRPC does. It takes a contract (Go interface instead of a protobuf schema) and generates both RPC client/server code allowing services to call each other over network, with streaming support as well. It is not cross-language and cross-platform yet, unlike gRPC, that's a simplification for now. Most of this package is focused on proper RPC generation and optimization, rather than service discovery and load balancing, with [AstraNet](http://github.com/astranet/astranet) being the core behind networking.
 
 ### Install
 
