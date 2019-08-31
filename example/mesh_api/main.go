@@ -3,11 +3,12 @@ package main
 import (
 	"context"
 	"log"
+	"net/http"
 	"os"
 	"time"
 
+	"github.com/astranet/httpserve"
 	"github.com/astranet/meshRPC/cluster"
-	"github.com/gin-gonic/gin"
 	cli "github.com/jawher/mow.cli"
 	"github.com/xlab/closer"
 
@@ -33,17 +34,11 @@ var (
 		EnvVar: "MESHRPC_LISTEN_ADDR",
 		Value:  "0.0.0.0:11999",
 	})
-	httpListenHost = app.String(cli.StringOpt{
-		Name:   "H http-host",
-		Desc:   "Specify listen HTTP host.",
-		EnvVar: "APP_HTTP_HOST",
-		Value:  "0.0.0.0",
-	})
-	httpListenPort = app.String(cli.StringOpt{
+	httpListenPort = app.Int(cli.IntOpt{
 		Name:   "P http-port",
 		Desc:   "Specify listen HTTP port.",
 		EnvVar: "APP_HTTP_PORT",
-		Value:  "8282",
+		Value:  8282,
 	})
 )
 
@@ -57,7 +52,7 @@ func main() {
 				*clusterName,
 			},
 			Nodes: *clusterNodes,
-			// Debug: true,
+			Debug: true,
 		})
 		// Listen on a TCP address, this address can be used
 		// by other peers to discover each other in this cluster.
@@ -73,7 +68,7 @@ func main() {
 
 func httpListenAndServe(c cluster.Cluster) {
 	// Init default Gin router
-	router := gin.Default()
+	router := httpserve.New()
 	// Wait until greeter service dependency is available.
 	wait(c, map[string]cluster.HandlerSpec{
 		"greeter": greeter.RPCHandlerSpec,
@@ -87,21 +82,19 @@ func httpListenAndServe(c cluster.Cluster) {
 	// Set an endpoint handler for the Greet function.
 	// Example Request:
 	// $ curl http://localhost:8282/greeter/greet/Max
-	router.GET("/greeter/greet/:name", func(c *gin.Context) {
+	router.GET("/greeter/greet/:name", func(c *httpserve.Context) httpserve.Response {
 		// Service call is actually done over meshRPC...
 		message, err := svc.Greet(c.Param("name"))
 		if err != nil {
-			c.JSON(500, err.Error())
-			return
+			return httpserve.NewJSONResponse(http.StatusInternalServerError, err)
 		}
-		c.JSON(200, message)
-		return
+		return httpserve.NewJSONResponse(http.StatusOK, message)
 	})
 
 	// Set an endpoint handler for the SendPostcard function.
 	// Example Request:
 	// $ curl -X POST http://localhost:8282/greeter/sendPostcard/Max/World/Hello
-	router.POST("/greeter/sendPostcard/:recipient/:address/:message", func(c *gin.Context) {
+	router.POST("/greeter/sendPostcard/:recipient/:address/:message", func(c *httpserve.Context) httpserve.Response {
 		// Fill the object fields with supplied params.
 		postcard := &greeter.Postcard{
 			Recipient: c.Param("recipient"),
@@ -111,11 +104,9 @@ func httpListenAndServe(c cluster.Cluster) {
 		// Service call is actually done over meshRPC...
 		err := svc.SendPostcard(postcard)
 		if err != nil {
-			c.JSON(500, err.Error())
-			return
+			return httpserve.NewJSONResponse(http.StatusInternalServerError, err)
 		}
-		c.JSON(200, postcard)
-		return
+		return httpserve.NewJSONResponse(http.StatusOK, postcard)
 	})
 
 	// Bonus! Simply expose you custom HTTP handlers with "Use" function.
@@ -126,14 +117,13 @@ func httpListenAndServe(c cluster.Cluster) {
 	// Example Request:
 	// $ curl http://localhost:8282/greeter/check
 	greeterClient2 := c.NewClient("greeter", greeter.HandlerSpec)
-	router.GET("/greeter/check", gin.WrapH(greeterClient2.Use("Check")))
+	router.GET("/greeter/check", wrapHandler(greeterClient2.Use("Check")))
 	// And meshRPC endpoints too!
 	// Example Request:
 	// $ curl -d'{"name": "Max"}' http://localhost:8282/greeter/greet
-	router.POST("/greeter/greet", gin.WrapH(greeterClient.Use("Greet")))
+	router.POST("/greeter/greet", wrapHandler(greeterClient.Use("Greet")))
 
-	listenAddr := *httpListenHost + ":" + *httpListenPort
-	if err := router.Run(listenAddr); err != nil {
+	if err := router.Listen(uint16(*httpListenPort)); err != nil {
 		log.Fatalln(err)
 	}
 }
@@ -143,5 +133,12 @@ func wait(c cluster.Cluster, specs map[string]cluster.HandlerSpec) {
 	defer cancelFn()
 	if err := c.Wait(ctx, specs); err != nil {
 		log.Println("mesh_rpc: service await failure:", err)
+	}
+}
+
+func wrapHandler(handler http.Handler) httpserve.Handler {
+	return func(c *httpserve.Context) httpserve.Response {
+		handler.ServeHTTP(c.Writer, c.Request)
+		return httpserve.NewAdoptResponse()
 	}
 }

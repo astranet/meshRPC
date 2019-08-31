@@ -4,16 +4,14 @@
 package greeter
 
 import (
-	"bytes"
 	"encoding/json"
-	"io"
 
-	"github.com/gin-gonic/gin"
+	"github.com/astranet/httpserve"
 )
 
 type RPCHandler interface {
-	Greet(ctx *gin.Context)
-	SendPostcard(ctx *gin.Context)
+	Greet(*httpserve.Context) httpserve.Response
+	SendPostcard(*httpserve.Context) httpserve.Response
 }
 
 var RPCHandlerSpec RPCHandler = &rpcHandler{}
@@ -48,11 +46,10 @@ type GreetRequest struct {
 }
 
 type GreetResponse struct {
-	ErrorResponse
 	Message string `json:"message,omitempty"`
 }
 
-func (_handler *rpcHandler) Greet(_ctx *gin.Context) {
+func (_handler *rpcHandler) Greet(_ctx *httpserve.Context) (_res httpserve.Response) {
 	// TODO: Report Stats + Timing
 
 	var _req GreetRequest
@@ -62,14 +59,7 @@ func (_handler *rpcHandler) Greet(_ctx *gin.Context) {
 	if _err != nil {
 		// TODO: Report Error
 
-		_data, _ := json.Marshal(&GreetResponse{
-			ErrorResponse: ErrorResponse{
-				Error: _err.Error(),
-			},
-		})
-		_ctx.Status(400)
-		// TODO: Report Stats
-		_, _ = io.Copy(_ctx.Writer, bytes.NewReader(_data))
+		_res = httpserve.NewJSONResponse(400, _err)
 		return
 	}
 	var _resp GreetResponse
@@ -77,21 +67,11 @@ func (_handler *rpcHandler) Greet(_ctx *gin.Context) {
 	if _err != nil {
 		// TODO: Report Error
 
-		_data, _ := json.Marshal(&GreetResponse{
-			ErrorResponse: ErrorResponse{
-				Error: _err.Error(),
-			},
-		})
-		_ctx.Status(400)
-		// TODO: Report Stats
-		_, _ = io.Copy(_ctx.Writer, bytes.NewReader(_data))
+		_res = httpserve.NewJSONResponse(400, _err)
 		return
 	}
 
-	_data, _ := json.Marshal(&_resp)
-	_ctx.Status(200)
-	// TODO: Report Stats
-	_, _ = io.Copy(_ctx.Writer, bytes.NewReader(_data))
+	_res = httpserve.NewJSONResponse(200, &_resp)
 	return
 }
 
@@ -100,10 +80,9 @@ type SendPostcardRequest struct {
 }
 
 type SendPostcardResponse struct {
-	ErrorResponse
 }
 
-func (_handler *rpcHandler) SendPostcard(_ctx *gin.Context) {
+func (_handler *rpcHandler) SendPostcard(_ctx *httpserve.Context) (_res httpserve.Response) {
 	// TODO: Report Stats + Timing
 
 	var _req SendPostcardRequest
@@ -113,14 +92,7 @@ func (_handler *rpcHandler) SendPostcard(_ctx *gin.Context) {
 	if _err != nil {
 		// TODO: Report Error
 
-		_data, _ := json.Marshal(&SendPostcardResponse{
-			ErrorResponse: ErrorResponse{
-				Error: _err.Error(),
-			},
-		})
-		_ctx.Status(400)
-		// TODO: Report Stats
-		_, _ = io.Copy(_ctx.Writer, bytes.NewReader(_data))
+		_res = httpserve.NewJSONResponse(400, _err)
 		return
 	}
 	var _resp SendPostcardResponse
@@ -128,21 +100,11 @@ func (_handler *rpcHandler) SendPostcard(_ctx *gin.Context) {
 	if _err != nil {
 		// TODO: Report Error
 
-		_data, _ := json.Marshal(&SendPostcardResponse{
-			ErrorResponse: ErrorResponse{
-				Error: _err.Error(),
-			},
-		})
-		_ctx.Status(400)
-		// TODO: Report Stats
-		_, _ = io.Copy(_ctx.Writer, bytes.NewReader(_data))
+		_res = httpserve.NewJSONResponse(400, _err)
 		return
 	}
 
-	_data, _ := json.Marshal(&_resp)
-	_ctx.Status(200)
-	// TODO: Report Stats
-	_, _ = io.Copy(_ctx.Writer, bytes.NewReader(_data))
+	_res = httpserve.NewJSONResponse(200, &_resp)
 	return
 }
 

@@ -44,7 +44,7 @@ func main() {
 				*clusterName,
 			},
 			Nodes: *clusterNodes,
-			// Debug: true,
+			Debug: true,
 		})
 		// Init a new service instance (that is your code)
 		service := greeter.NewService()

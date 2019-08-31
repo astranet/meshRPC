@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"net/http"
 
+	"github.com/astranet/httpserve"
 	"github.com/pkg/errors"
 )
 
@@ -56,9 +57,7 @@ func (_client *rpcClient) Greet(name string) (message string, _err error) {
 	_respBody, _err = _client.do(_client.newJsonReq("POST", "Greet", _req))
 	if _err != nil {
 		return
-	} else if _err = _client.checkJsonRespErr(_respBody); _err != nil {
-		return
-	} else if json.Unmarshal(_respBody, &_resp); _err != nil {
+	} else if _err = httpserve.UnmarshalJSONValue(_respBody, &_resp); _err != nil {
 		return
 	}
 	message = _resp.Message
@@ -76,9 +75,7 @@ func (_client *rpcClient) SendPostcard(card *Postcard) (_err error) {
 	_respBody, _err = _client.do(_client.newJsonReq("POST", "SendPostcard", _req))
 	if _err != nil {
 		return
-	} else if _err = _client.checkJsonRespErr(_respBody); _err != nil {
-		return
-	} else if json.Unmarshal(_respBody, &_resp); _err != nil {
+	} else if _err = httpserve.UnmarshalJSONValue(_respBody, &_resp); _err != nil {
 		return
 	}
 	return
