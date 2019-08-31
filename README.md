@@ -250,14 +250,14 @@ Let's run other example endpoints as well:
 
 ```
 $ curl -d'{"name": "Max"}' http://localhost:8282/greeter/greet
-{"error":"","message":"Hello, Max"}
+{"data":{"message":"Hello, Max"},"errors":[]}
 ```
 
 This is an internal RPC endpoint, but it is exposed as part of API surface: you're talking directly to a `greeter` node, but using your `mesh_api` gateway as an entrypoint. Please note, that if data serialization protocol is other than JSON, Protobuf for example, it means you will deal with binary data.
 
 ```
 $ curl http://localhost:8282/greeter/check
-All ok! 2019-05-24T16:29:04+03:00
+{"data":{"fingerprint":"19a8dd592e479961","status":"ok","timestamp":"2019-08-31T03:42:25+03:00"},"errors":[]}
 ```
 
 This is the "legacy" HTTP endpoint that `greeter` service always had. But it is exposed
@@ -268,7 +268,7 @@ A final example of complex data transfer between two services:
 
 ```
 $ curl -X POST http://localhost:8282/greeter/sendPostcard/Max/World/Hello
-{"PictureURL":"","Address":"World","Recipient":"Max","Message":"Hello"}
+{"data":{"PictureURL":"","Address":"World","Recipient":"Max","Message":"Hello"},"errors":[]}
 ```
 
 In `greeter` logs:

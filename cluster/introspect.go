@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/gin-gonic/gin"
+	"github.com/astranet/httpserve"
 )
 
 type HandlerSpec interface{}
@@ -36,7 +36,7 @@ func reflectEndpoints(serviceName string, spec HandlerSpec) ([]*EndpointInfo, er
 	for i := 0; i < n; i++ {
 		m := specTyp.Method(i)
 		if isHandlerFunc(m.Type) {
-			handlerFn := specVal.MethodByName(m.Name).Interface().(func(c *gin.Context))
+			handlerFn := specVal.MethodByName(m.Name).Interface().(func(c *httpserve.Context) httpserve.Response)
 			endpoint := &EndpointInfo{
 				Service: serviceName,
 				Path:    fmt.Sprintf("/%s/%s", handlerName, m.Name),
@@ -59,6 +59,13 @@ func reflectEndpoints(serviceName string, spec HandlerSpec) ([]*EndpointInfo, er
 func reflectEndpointInfo(serviceName string, spec HandlerSpec, fnName string) (*EndpointInfo, error) {
 	if spec == nil {
 		return nil, errors.New("reflectEndpointInfo: spec is nil")
+	}
+	if handlerName, ok := spec.(string); ok {
+		endpoint := &EndpointInfo{
+			Service: serviceName,
+			Path:    fmt.Sprintf("/%s/%s", handlerName, fnName),
+		}
+		return endpoint, nil
 	}
 	specTyp := reflect.TypeOf(spec)
 	if len(fnName) > 0 {
@@ -94,7 +101,7 @@ type EndpointInfo struct {
 	Path    string
 	Methods []string
 	SpecTyp reflect.Type
-	Handler func(c *gin.Context)
+	Handler func(c *httpserve.Context) httpserve.Response
 }
 
 func (e *EndpointInfo) MethodAllowed(method string) bool {
@@ -111,6 +118,9 @@ func (e *EndpointInfo) MethodAllowed(method string) bool {
 }
 
 func (e *EndpointInfo) IsValidHandler(name string) bool {
+	if e.SpecTyp == nil {
+		return true
+	}
 	fn, exists := e.SpecTyp.MethodByName(name)
 	if !exists {
 		return false
@@ -118,10 +128,7 @@ func (e *EndpointInfo) IsValidHandler(name string) bool {
 	return isHandlerFunc(fn.Type)
 }
 
-// var httpResponseWriterTyp = reflect.TypeOf((*http.ResponseWriter)(nil)).Elem()
-// var httpHandlerFuncTyp = reflect.TypeOf((*http.HandlerFunc)(nil)).Elem()
-// var httpRequestTyp = reflect.TypeOf((*http.Request)(nil))
-var ginContextTyp = reflect.TypeOf((*gin.Context)(nil))
+var httpContextTyp = reflect.TypeOf((*httpserve.Context)(nil))
 
 // ifacePkgName returns package path for an interface type, and the type's name.
 func ifaceToPkgName(typ reflect.Type) (pkgName string, typName string) {
@@ -131,16 +138,16 @@ func ifaceToPkgName(typ reflect.Type) (pkgName string, typName string) {
 	return
 }
 
-// isHandlerFunc basically checks method to match http.HandlerFunc
-// func(http.ResponseWriter, *http.Request)
+// isHandlerFunc basically checks method to match httpserve.HandlerFunc
+// func(*httpserve.Context) httpserve.Response
 func isHandlerFunc(fn reflect.Type) bool {
 	if fn.NumIn() != 2 {
 		return false
 	}
-	if fn.NumOut() > 0 {
+	if fn.NumOut() != 1 {
 		return false
 	}
-	if fn.In(1) != ginContextTyp {
+	if fn.In(1) != httpContextTyp {
 		return false
 	}
 	return true

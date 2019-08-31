@@ -9,7 +9,7 @@ import (
 func genRPCHandlerInterface(iface *MethodsCollection) string {
 	buf := new(bytes.Buffer)
 	iface.ForEachMethod(func(m *Method) error {
-		fmt.Fprintf(buf, "%s(ctx *gin.Context)\n", m.Name)
+		fmt.Fprintf(buf, "%s(*httpserve.Context) httpserve.Response\n", m.Name)
 		return nil
 	})
 	return buf.String()
@@ -37,7 +37,7 @@ func genServiceClientImplementation(recvName, featurePrefix string, iface *Metho
 
 func rpcHandlerMethod(recvName, featurePrefix string, m *Method) string {
 	buf := new(bytes.Buffer)
-	fmt.Fprintf(buf, "func (_handler *%s) %s(_ctx *gin.Context) {\n", recvName, m.Name)
+	fmt.Fprintf(buf, "func (_handler *%s) %s(_ctx *httpserve.Context) (_res httpserve.Response) {\n", recvName, m.Name)
 
 	// logging and metrics
 	fmt.Fprintf(buf, "// TODO: Report Stats + Timing\n\n")
@@ -50,43 +50,26 @@ func rpcHandlerMethod(recvName, featurePrefix string, m *Method) string {
 	if _err != nil {
 		// TODO: Report Error
 
-		_data, _ := json.Marshal(&%sResponse{
-			%sErrorResponse: %sErrorResponse{
-				Error: _err.Error(),
-			},
-		})
-		_ctx.Status(400)
-		// TODO: Report Stats
-		_, _  = io.Copy(_ctx.Writer, bytes.NewReader(_data))
+		_res = httpserve.NewJSONResponse(400, _err)
 		return
-	}`, m.Name, m.Name, featurePrefix, featurePrefix)
-	fmt.Fprintln(buf, "")
+	}
+	`, m.Name)
 
 	fmt.Fprintf(buf, "var _resp %sResponse\n", m.Name)
 	fmt.Fprintf(buf, "%s\n", funcCallMapping(m))
 
 	// error handling
-	fmt.Fprintf(buf, `if _err != nil {
+	fmt.Fprintln(buf, `if _err != nil {
 		// TODO: Report Error
 
-		_data, _ := json.Marshal(&%sResponse{
-			%sErrorResponse: %sErrorResponse{
-				Error: _err.Error(),
-			},
-		})
-		_ctx.Status(400)
-		// TODO: Report Stats
-		_, _  = io.Copy(_ctx.Writer, bytes.NewReader(_data))
+		_res = httpserve.NewJSONResponse(400, _err)
 		return
-	}`, m.Name, featurePrefix, featurePrefix)
-	fmt.Fprintln(buf, "")
+	}
+	`)
 
 	// response encoding
 	fmt.Fprintf(buf, `
-		_data, _ := json.Marshal(&_resp)
-		_ctx.Status(200)
-		// TODO: Report Stats
-		_, _  = io.Copy(_ctx.Writer, bytes.NewReader(_data))
+		_res = httpserve.NewJSONResponse(200, &_resp)
 		return
 	`)
 
@@ -118,9 +101,7 @@ func serviceClientMethod(recvName string, m *Method) string {
 	// error handling
 	fmt.Fprintf(buf, `if _err != nil {
 		return
-	} else if _err = _client.checkJsonRespErr(_respBody); _err != nil {
-		return
-	} else if json.Unmarshal(_respBody, &_resp); _err != nil {
+	} else if _err = httpserve.UnmarshalJSONValue(_respBody, &_resp); _err != nil {
 		return
 	}`)
 	fmt.Fprintln(buf, "")
@@ -161,7 +142,6 @@ func reqFieldsMap(m *Method) string {
 func respModelJSON(featureName string, m *Method) string {
 	buf := new(bytes.Buffer)
 	fmt.Fprintf(buf, "type %sResponse struct {\n", m.Name)
-	fmt.Fprintf(buf, "%sErrorResponse\n", featureName)
 	for i, p := range m.Res {
 		if p.Type == "error" {
 			// errors are handled by method implementation,

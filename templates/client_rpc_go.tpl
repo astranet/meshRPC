@@ -56,7 +56,7 @@ func (_client *{{.RPCClientPrivateName}}) do(req *http.Request) ([]byte, error) 
 	}
 	respBody, _ := ioutil.ReadAll(resp.Body)
 	_ = resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		if len(respBody) > 0 {
 			err := errors.Errorf("service error %d: %s", resp.StatusCode, string(respBody))
 			return nil, err
@@ -71,13 +71,4 @@ func (_client *{{.RPCClientPrivateName}}) newJsonReq(method string, fnName strin
 	data, _ := json.Marshal(v)
 	req, _ := http.NewRequest(method, fnName, bytes.NewReader(data))
 	return req
-}
-
-func (_client *{{.RPCClientPrivateName}}) checkJsonRespErr(resp []byte) error {
-	var e {{.FeaturePrefix}}ErrorResponse
-	_ = json.Unmarshal(resp, &e)
-	if len(e.Error) == 0 {
-		return nil
-	}
-	return errors.New(e.Error)
 }

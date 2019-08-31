@@ -8,7 +8,7 @@ import (
 	"encoding/json"
 	"io"
 
-	"github.com/gin-gonic/gin"
+	"github.com/astranet/httpserve"
 )
 
 type {{.FeaturePrefix}}RPCHandler interface {
@@ -52,8 +52,4 @@ var {{.RPCHandlerPrivateName}}MethodsMap = map[string][]string{
 
 func (_ *{{.RPCHandlerPrivateName}}) HTTPMethodsMap() map[string][]string {
 	return {{.RPCHandlerPrivateName}}MethodsMap
-}
-
-type {{.FeaturePrefix}}ErrorResponse struct {
-	Error string `json:"error"`
 }

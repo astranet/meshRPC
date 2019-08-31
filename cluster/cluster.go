@@ -40,6 +40,9 @@ type Cluster interface {
 	// services became available upon context cancellation. Specs contains a mapping
 	// ServiceName -> HandlerSpec.
 	Wait(ctx context.Context, specs map[string]HandlerSpec) error
+	// PingService allows to check service liveness and availability.
+	// Used in Wait method internally, but is safe to be called directly.
+	PingService(ctx context.Context, serviceName string) ServiceState
 	// NewClient returns a new cluster.Client for accessing published endpoints of
 	// services. The mandatory HandlerSpec argument accepts any interface type has
 	// http.HandlerFunc methods, like in Publish, but the its implementation is not
