@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"net"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -10,19 +10,17 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/vroomy/plugins"
 
-	"github.com/astranet/httpserve"
+	"github.com/Hatch1fy/httpserve"
 	"github.com/astranet/meshRPC/cluster"
 )
 
 var (
-	cfg    *PluginConfig
-	log    *logrus.Entry
-	mesh   cluster.Cluster
-	routes map[string]string
+	cfg  *PluginConfig
+	log  *logrus.Entry
+	mesh cluster.Cluster
 )
 
 func init() {
-	routes = make(map[string]string)
 	log = logrus.WithFields(logrus.Fields{
 		"plugin": "meshrpc",
 	})
@@ -40,14 +38,14 @@ func OnInit(p *plugins.Plugins, env map[string]string) error {
 	// Listen on a TCP address, this address can be used
 	// by other peers to discover each other in this cluster.
 	if err := mesh.ListenAndServe(
-		net.JoinHostPort(cfg.ListenHost, cfg.ListenPort),
+		fmt.Sprintf("%s:%d", cfg.ListenHost, cfg.ListenPort),
 	); err != nil {
 		return err
 	}
 
 	// TODO: implement optional waiting for service dependencies
 	// How a plugin would know all routes it is used for?
-	log.Println("OnInit done")
+	// Observation: OnInit is done before Route() closure is evaluated on start.
 	return nil
 }
 
@@ -68,12 +66,14 @@ func Ping(c *httpserve.Context) (res httpserve.Response) {
 	switch state {
 	case cluster.StateOK:
 		code = http.StatusOK
+		return httpserve.NewJSONResponse(code, time.Since(ts).String())
 	case cluster.StateTimeout, cluster.StateCanceled:
 		code = http.StatusGatewayTimeout
+		return httpserve.NewJSONResponse(code, errors.New(time.Since(ts).String()))
 	default:
 		code = http.StatusBadGateway
+		return httpserve.NewJSONResponse(code, errors.New(time.Since(ts).String()))
 	}
-	return httpserve.NewJSONResponse(code, time.Since(ts).String())
 }
 
 var ErrInsufficientParams = errors.New("insufficient params count")
@@ -89,19 +89,18 @@ func Route(params ...string) (handler httpserve.Handler, err error) {
 		err = errors.Wrap(ErrInsufficientParams, "no service name provided")
 		return nil, err
 	}
-	methodName := params[1]
+	handlerName := params[1]
+	if len(handlerName) == 0 {
+		err = errors.Wrap(ErrInsufficientParams, "no handler name provided")
+		return nil, err
+	}
+	methodName := params[2]
 	if len(methodName) == 0 {
 		err = errors.Wrap(ErrInsufficientParams, "no method name provided")
 		return nil, err
 	}
-	specPath := params[2]
-	if len(specPath) == 0 {
-		err = errors.Wrap(ErrInsufficientParams, "no spec path provided")
-		return nil, err
-	}
 	// TODO: cache this client with given params?
-	cli := mesh.NewClient(serviceName, specPath).Use(methodName)
-	log.Println("getting handler for", serviceName, methodName, specPath)
+	cli := mesh.NewClient(serviceName, handlerName).Use(methodName)
 
 	handler = func(c *httpserve.Context) (res httpserve.Response) {
 		cli.ServeHTTP(c.Writer, c.Request)

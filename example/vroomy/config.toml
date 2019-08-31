@@ -1,0 +1,17 @@
+port = 8080
+
+plugins = [
+	"github.com/astranet/meshRPC/plugins/vroomy as meshrpc",
+]
+
+include = [
+	"./routes/services.toml",
+	"./routes/greeter.toml",
+]
+
+[env]
+# meshrpc_host = "localhost"
+meshrpc_port = "11999"
+meshrpc_debug = "true"
+# meshrpc_cluster_name = "vroomy-meshrpc"
+# meshrpc_cluster_nodes = []

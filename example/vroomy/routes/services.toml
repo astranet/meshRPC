@@ -1,0 +1,12 @@
+[[group]]
+name = "services"
+httpPath = "/services/"
+handlers = []
+
+[[route]]
+method = "GET"
+group = "services"
+httpPath = "/ping/:service"
+handlers = [
+	"meshrpc.Ping",
+]

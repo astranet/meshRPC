@@ -1,0 +1,29 @@
+[[group]]
+name = "greeter"
+group = "services"
+httpPath = "/greeter"
+handlers = []
+
+[[route]]
+method = "GET"
+group = "greeter"
+httpPath = "/check"
+handlers = [
+	"meshrpc.Route(greeter,handler,Check)",
+]
+
+[[route]]
+method = "POST"
+group = "greeter"
+httpPath = "/greet"
+handlers = [
+	"meshrpc.Route(greeter,rpcHandler,Greet)",
+]
+
+[[route]]
+method = "POST"
+group = "greeter"
+httpPath = "/sendPostcard"
+handlers = [
+	"meshrpc.Route(greeter,rpcHandler,SendPostcard)",
+]
