@@ -1,3 +1,4 @@
 ./data
-./plugins
+./plugins/*
+./plugins/meshrpc.so
 panics.log
