@@ -135,14 +135,14 @@ func (t *TemplateContext) RenderInto(tpl *template.Template) []byte {
 
 func rpcHandlerPrivateName(featurePrefix string) string {
 	if len(featurePrefix) == 0 {
-		return "rpcHandler"
+		return "rPCHandler"
 	}
 	return strings.ToLower(string(featurePrefix[0])) + featurePrefix[1:] + "RPCHandler"
 }
 
 func rpcClientPrivateName(featurePrefix string) string {
 	if len(featurePrefix) == 0 {
-		return "rpcClient"
+		return "rPCClient"
 	}
 	return strings.ToLower(string(featurePrefix[0])) + featurePrefix[1:] + "RPCClient"
 }

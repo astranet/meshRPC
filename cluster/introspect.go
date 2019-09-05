@@ -76,7 +76,7 @@ func reflectEndpointInfo(serviceName string, spec HandlerSpec, fnName string) (*
 	httpMethods := httpMethodsOf(spec)
 	endpoint := &EndpointInfo{
 		Service: serviceName,
-		Path:    fmt.Sprintf("/%s/%s", handlerName, fnName),
+		Path:    fmt.Sprintf("/%s/%s", asPrivate(handlerName), fnName),
 		SpecTyp: specTyp,
 	}
 	if methods, ok := httpMethods["*"]; ok {
@@ -87,6 +87,13 @@ func reflectEndpointInfo(serviceName string, spec HandlerSpec, fnName string) (*
 		endpoint.Methods = httpMethods[fnName]
 	}
 	return endpoint, nil
+}
+
+func asPrivate(str string) string {
+	if len(str) < 2 {
+		return strings.ToLower(str)
+	}
+	return strings.ToLower(str[:1]) + str[1:]
 }
 
 type EndpointInfo struct {
@@ -111,7 +118,8 @@ func (e *EndpointInfo) MethodAllowed(method string) bool {
 }
 
 func (e *EndpointInfo) IsValidHandler(name string) bool {
-	fn, exists := e.SpecTyp.MethodByName(name)
+	implTyp := e.SpecTyp.Elem()
+	fn, exists := implTyp.MethodByName(name)
 	if !exists {
 		return false
 	}
@@ -134,14 +142,21 @@ func ifaceToPkgName(typ reflect.Type) (pkgName string, typName string) {
 // isHandlerFunc basically checks method to match http.HandlerFunc
 // func(http.ResponseWriter, *http.Request)
 func isHandlerFunc(fn reflect.Type) bool {
-	if fn.NumIn() != 2 {
-		return false
-	}
 	if fn.NumOut() > 0 {
 		return false
 	}
-	if fn.In(1) != ginContextTyp {
+	switch fn.NumIn() {
+	case 2:
+		if fn.In(1) != ginContextTyp {
+			return false
+		}
+		return true
+	case 1:
+		if fn.In(0) != ginContextTyp {
+			return false
+		}
+		return true
+	default:
 		return false
 	}
-	return true
 }
